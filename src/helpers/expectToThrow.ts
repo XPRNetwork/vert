@@ -10,7 +10,7 @@ export const expectToThrow = async (promise: Promise<any>, errorMsg?: string) =>
         await promise
         throw new Error(`Was expecting to fail with ${errorMsg}`)
     } catch (e: any) {
-        if ( errorMsg ) expect(e.message).to.include(errorMsg)
+        if ( errorMsg ) expect(e.message).to.be.deep.eq(errorMsg)
         else expect(!!e.message).to.be.true;
     }
 }

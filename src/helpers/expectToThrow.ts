@@ -5,11 +5,12 @@ import { expect } from "chai"
  * @param promise - The promise to await.
  * @param {string} errorMsg - The error message that we expect to see.
  */
-export const expectToThrow = async (promise: Promise<any>, errorMsg: string) => {
+export const expectToThrow = async (promise: Promise<any>, errorMsg?: string) => {
     try {
         await promise
         throw new Error(`Was expecting to fail with ${errorMsg}`)
     } catch (e: any) {
-        expect(e.message).to.be.deep.eq(errorMsg)
+        if ( errorMsg ) expect(e.message).to.include(errorMsg)
+        else expect(!!e.message).to.be.true;
     }
 }

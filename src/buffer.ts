@@ -102,7 +102,7 @@ export default class Buffer extends Uint8Array {
     if (!this.view) {
       this.view = new DataView(this.buffer, this.byteOffset, this.length);
     }
-    this.view.setFloat64(value, offset);
+    this.view.setFloat64(offset, value);
   }
 
   toString(encoding = 'utf8'): string {

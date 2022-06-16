@@ -152,16 +152,16 @@ export class Blockchain {
   * @param {Blockchain} bc - Blockchain - the blockchain to create the contract on
   * @param {NameType} name - Name of the contract.
   * @param {string} folder - The folder name of the contract.
-  * @param [sendsInline=false] - If true, the contract will send inline. If false, it will send to a new
+  * @param [enableInline=false] - If true, the contract will send inline. If false, it will send to a new
   * account.
   * @returns The contract account.
   */
-  createContract (name: NameType, folder: string, sendsInline = false) {
+  createContract (name: NameType, folder: string, enableInline = true) {
     return this.createAccount({
         name: Name.from(name),
         wasm: this.readWasm(`${folder}.wasm`),
         abi: this.readAbi(`${folder}.abi`),
-        sendsInline
+        enableInline
     });
   }
 

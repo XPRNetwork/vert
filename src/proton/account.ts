@@ -9,7 +9,7 @@ export type AccountArgs = Omit<Partial<Account>, 'name'|'abi'|'wasm'> & {
   name: NameType,
   abi?: ABIDef | Promise<ABIDef>;
   wasm?: Uint8Array | Promise<Uint8Array>;
-  sendsInline?: boolean;
+  enableInline?: boolean;
 }
 
 function isPromise(promise: any) {  
@@ -42,7 +42,7 @@ export class Account {
 
     // Permissions
     this.permissions = args.permissions || generatePermissions(this.name)
-    if (args.sendsInline) {
+    if (args.enableInline) {
       addInlinePermission(this.name, this.permissions)
     }
 

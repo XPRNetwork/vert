@@ -147,7 +147,7 @@ class IndexObject<K> implements IndexKey<K> {
   }
 
   static compare(a, b): number {
-    return IndexObject.compareTable(a, b) ||
+    return IndexObject.compareTable(a, b) &&
       (a.ignorePrimaryKey || b.ignorePrimaryKey)
         ? 0
         : ((a.primaryKey < b.primaryKey) ? -1 : (a.primaryKey > b.primaryKey) ? 1 : 0);

@@ -80,7 +80,7 @@ abstract class PrefixedStore<K,V> {
 class Store<K,V> {
   private readonly store: BTree<K,V>;
   private prefixes = new BTree<any,PrefixedStore<any,V>>(undefined, defaultComparator);
-  private prefixesIndex = new Map<number,PrefixedStore<any,V>>();
+  public prefixesIndex = new Map<number,PrefixedStore<any,V>>();
   private changes = new Array<StoreChange>();
   private isReverting = false;
   private _seq = 0;

@@ -450,13 +450,20 @@ class TableView {
     return
   }
 
-  getTableRows(lowerBound: bigint = BigInt(0)): any {
+  getTableRows(lowerBound: bigint = BigInt(0), options: { limit?: number } = {}): any {
     const rows = []
-    let kvNext = this.bc.store.getTableById(this.tab.id).lowerbound(0n)
+    let kvNext = this.bc.store.getTableById(this.tab.id).lowerbound(lowerBound)
+
     while (kvNext) {
       rows.push(this.getTableRow(kvNext.primaryKey))
+
+      if (options.limit && rows.length >= options.limit) {
+        break;
+      }
+
       kvNext = this.bc.store.getTableById(this.tab.id).next(kvNext.primaryKey)
     }
+
     return rows
   }
 }

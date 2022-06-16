@@ -10,7 +10,7 @@ const strToAccount = (str: string) => blockchain.createAccount({
   name: str,
   wasm: fs.readFileSync(path.join(__dirname, `output/${str}.wasm`)),
   abi: fs.readFileSync(path.join(__dirname, `output/${str}.abi`), 'utf8'),
-  sendsInline: true
+  enableInline: true
 })
 
 const accounts = {}

@@ -3,13 +3,14 @@ import Buffer from "../buffer";
 import { log, Vert } from "../vert";
 import { IndexObject, KeyValueObject, SecondaryKeyStore, Table } from "./table";
 import { IteratorCache } from "./iterator-cache";
-import { Action, Name, NameType, PermissionLevel, PublicKey, Serializer, Signature, Transaction, UInt64 } from "@greymass/eosio";
+import { Action, Name, NameType, PermissionLevel, PublicKey, Serializer, Signature, Transaction, UInt64, Checksum256, Float64 } from "@greymass/eosio";
 import { sha256, sha512, sha1, ripemd160 } from "hash.js";
 import { bigIntToName, nameToBigInt, nameTypeToBigInt } from "./bn";
 import { Blockchain } from "./blockchain";
 import { Account } from "./account";
 import { protonAssert, protonAssertMessage, protonAssertCode } from "./errors";
 import { findLastIndex, isAuthoritySatisfied } from "./utils";
+import set from 'lodash.set'
 
 type ptr = number;
 type i32 = number;
@@ -364,7 +365,7 @@ class VM extends Vert {
         // db
         db_store_i64: (_scope: i64, _table: i64, _payer: i64, _id: i64, data: ptr, len: i32): i32 => {
           const [scope, table, payer, id] = convertToUnsigned(_scope, _table, _payer, _id);
-          log.debug(`db_store_i64: Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID: ${id}`);
+          log.debug(`db_store_i64: Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID ${id}`);
   
           const tab = this.findOrCreateTable(this.context.receiver.name, bigIntToName(scope), bigIntToName(table), bigIntToName(payer));
           assert(payer !== 0n, 'must specify a valid account to pay for new record');
@@ -447,7 +448,7 @@ class VM extends Vert {
         },
         db_find_i64: (_code: i64, _scope: i64, _table: i64, _id: i64): i32 => {
           const [code, scope, table, id] = convertToUnsigned(_code, _scope, _table, _id);
-          log.debug(`db_find_i64: Contract ${bigIntToName(code)} | Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID: ${id}`);
+          log.debug(`db_find_i64: Contract ${bigIntToName(code)} | Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID ${id}`);
   
           const tab = this.findTable(bigIntToName(code), bigIntToName(scope), bigIntToName(table));
           if (!tab) return -1;
@@ -458,7 +459,7 @@ class VM extends Vert {
         },
         db_lowerbound_i64: (_code: i64, _scope: i64, _table: i64, _id: i64): i32 => {
           const [code, scope, table, id] = convertToUnsigned(_code, _scope, _table, _id);
-          log.debug(`db_lowerbound_i64: Contract ${bigIntToName(code)} | Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID: ${id}`);
+          log.debug(`db_lowerbound_i64: Contract ${bigIntToName(code)} | Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID ${id}`);
   
           const tab = this.bc.store.findTable(code, scope, table);
           if (!tab) {
@@ -473,7 +474,7 @@ class VM extends Vert {
         },
         db_upperbound_i64: (_code: i64, _scope: i64, _table: i64, _id: i64): i32 => {
           const [code, scope, table, id] = convertToUnsigned(_code, _scope, _table, _id);
-          log.debug(`db_upperbound_i64: Contract ${bigIntToName(code)} | Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID: ${id}`);
+          log.debug(`db_upperbound_i64: Contract ${bigIntToName(code)} | Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID ${id}`);
   
           const tab = this.bc.store.findTable(code, scope, table);
           if (!tab) {
@@ -529,9 +530,10 @@ class VM extends Vert {
             code, scope, table, Buffer.from_(this.memory.buffer, secondary, 8), primaryKey, SecondaryKeyConverter.uint64);
         },
         db_idx64_lowerbound: (_code: bigint, _scope: bigint, _table: bigint, secondary: ptr, primary: ptr): i32 => {
-          log.debug('db_idx64_lowerbound');
           const [code, scope, table] = convertToUnsigned(_code, _scope, _table);
   
+          log.debug(`db_idx64_lowerbound: Code ${bigIntToName(code)} | Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | Secondary ${SecondaryKeyConverter.uint128.from(Buffer.from_(this.memory.buffer, secondary, 16))}`)
+
           return this.genericIndex.lowerbound_secondary(this.bc.store.idx64, this.idx64,
             code, scope, table, Buffer.from_(this.memory.buffer, secondary, 8), primary, SecondaryKeyConverter.uint64);
         },
@@ -633,14 +635,14 @@ class VM extends Vert {
 
           const itr = this.genericIndex.store(
             this.bc.store.idx256, this.idx256,
-            scope, table, payer, id, Buffer.from_(this.memory.buffer, data, data_len), SecondaryKeyConverter.checksum256);
+            scope, table, payer, id, Buffer.from_(this.memory.buffer, data, 32), SecondaryKeyConverter.checksum256);
           return itr;
         },
         db_idx256_update: (iterator: number, _payer: bigint, data: ptr, data_len: i32): void => {
           log.debug('db_idx256_update');
           const payer = BigInt.asUintN(64, _payer);
           this.genericIndex.update(this.bc.store.idx256, this.idx256, iterator, payer,
-            Buffer.from_(this.memory.buffer, data, data_len), SecondaryKeyConverter.checksum256);
+            Buffer.from_(this.memory.buffer, data, 32), SecondaryKeyConverter.checksum256);
         },
         db_idx256_remove: (iterator: number): void => {
           log.debug('db_idx256_remove');
@@ -651,7 +653,7 @@ class VM extends Vert {
           const [code, scope, table] = convertToUnsigned(_code, _scope, _table);
   
           return this.genericIndex.find_secondary(this.bc.store.idx256, this.idx256,
-            code, scope, table, Buffer.from_(this.memory.buffer, data, data_len), primary, SecondaryKeyConverter.checksum256);
+            code, scope, table, Buffer.from_(this.memory.buffer, data, 32), primary, SecondaryKeyConverter.checksum256);
         },
         db_idx256_find_primary: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, data_len: i32, _primary: bigint): i32 => {
           log.debug(`db_idx256_find_primary: Code ${_code} | Scope ${_scope} | Table ${_table} | Primary ${_primary}`)
@@ -659,21 +661,21 @@ class VM extends Vert {
           const [code, scope, table, primaryKey] = convertToUnsigned(_code, _scope, _table, _primary);
   
           return this.genericIndex.find_primary(this.bc.store.idx256, this.idx256,
-            code, scope, table, Buffer.from_(this.memory.buffer, data, data_len), primaryKey, SecondaryKeyConverter.checksum256);
+            code, scope, table, Buffer.from_(this.memory.buffer, data, 32), primaryKey, SecondaryKeyConverter.checksum256);
         },
         db_idx256_lowerbound: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, data_len: i32, primary: ptr): i32 => {
           log.debug('db_idx256_lowerbound');
           const [code, scope, table] = convertToUnsigned(_code, _scope, _table);
   
           return this.genericIndex.lowerbound_secondary(this.bc.store.idx256, this.idx256,
-            code, scope, table, Buffer.from_(this.memory.buffer, data, data_len), primary, SecondaryKeyConverter.checksum256);
+            code, scope, table, Buffer.from_(this.memory.buffer, data, 32), primary, SecondaryKeyConverter.checksum256);
         },
         db_idx256_upperbound: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, data_len: i32, primary: ptr): i32 => {
           log.debug('db_idx256_upperbound');
           const [code, scope, table] = convertToUnsigned(_code, _scope, _table);
   
           return this.genericIndex.upperbound_secondary(this.bc.store.idx256, this.idx256,
-            code, scope, table, Buffer.from_(this.memory.buffer, data, data_len), primary, SecondaryKeyConverter.checksum256);
+            code, scope, table, Buffer.from_(this.memory.buffer, data, 32), primary, SecondaryKeyConverter.checksum256);
         },
         db_idx256_end: (_code: bigint, _scope: bigint, _table: bigint): i32 => {
           log.debug('db_idx256_end');
@@ -816,6 +818,11 @@ class VM extends Vert {
         },
         prints_l: (msg: i32, len: i32): void => {
           const str = this.memory.readString(msg, len)
+
+          if (str === '$vertPrintStorage') {
+            this.printStorage()
+          }
+
           log.debug('prints_l', str);
           this.bc.console += str;
         },
@@ -1166,6 +1173,81 @@ class VM extends Vert {
     this.bc = bc;
   }
 
+  private printStorage() {
+    const indexes = ['idx64', 'idx128', 'idx256', 'idxDouble']
+    const rowsByTable = {}
+
+    const secondaryTableToPrimary = (sec: string) => {
+      if (sec.length === 13) {
+        sec = sec.slice(0, -1)
+      }
+
+      return sec.replace(/\.+$/, "")
+    }
+
+    const convertSecondary = (indexType, value) => {
+      if (indexType === 'idx64') {
+        indexType = 'idxu64'
+      } else if (indexType === 'idx128') {
+        indexType = 'idxU128'
+      } else if (indexType === 'idx256') {
+        const convertedValue = SecondaryKeyConverter.checksum256.from(value)
+        value = Checksum256.from(convertedValue).hexString
+        indexType = 'idxU256'
+      } else if (indexType === 'idxDouble') {
+        value = value.toString()
+      }
+
+      return {
+        type: indexType,
+        value: value
+      }
+    }
+
+    // Get all primary rows
+    for (const tab of Array.from(this.bc.store.prefixesIndex.values()) as Table[]) {
+      const codeName = bigIntToName(tab.code).toString()
+      const scopeName = bigIntToName(tab.scope).toString() || '.'
+      const tableName = secondaryTableToPrimary(bigIntToName(tab.table).toString())
+
+      if (!rowsByTable[tableName]) {
+        rowsByTable[tableName] = {}
+      }
+
+      if (!rowsByTable[tableName][scopeName]) {
+        rowsByTable[tableName][scopeName] = []
+      }
+
+      let value = tab.lowerbound(tab.lowestKey())
+
+      while (value) {
+        const primaryObj = {
+          tableId: value.tableId,
+          primaryKey: value.primaryKey,
+          payer: bigIntToName(value.payer).toString(),
+          value: this.bc.accounts[codeName].tables[tableName](tab.scope).getTableRow(value.primaryKey),
+          secondaryIndexes: []
+        }
+
+        for (const index of indexes) {
+          const secondaryObj = this.bc.store[index].get({
+            tableId: value.tableId,
+            primaryKey: value.primaryKey
+          });
+
+          if (secondaryObj) {
+            primaryObj.secondaryIndexes.push(convertSecondary(index, secondaryObj.secondaryKey))
+          }
+        }
+
+        rowsByTable[tableName][scopeName].push(primaryObj)
+        value = tab.next(value.primaryKey)
+      }
+    }
+
+    console.dir(rowsByTable, { depth: null })
+  }
+
   private findTable(code: NameType, scope: NameType, table: NameType): Table | undefined {
     return this.bc.store.findTable(nameTypeToBigInt(code), nameTypeToBigInt(scope), nameTypeToBigInt(table));
   }
@@ -1260,7 +1342,7 @@ class VM extends Vert {
         tableId: tab.id,
         primaryKey: 0n,
         secondaryKey: conv.from(secondary),
-        ignorePrimaryKey: true,
+        ignorePrimaryKey: false,
       });
       if (!obj) return ei;
       this.memory.writeUInt64(primary, obj.primaryKey);
@@ -1281,7 +1363,7 @@ class VM extends Vert {
         tableId: tab.id,
         primaryKey: 0n,
         secondaryKey: conv.from(secondary),
-        ignorePrimaryKey: true,
+        ignorePrimaryKey: false,
       });
       if (!obj) return ei;
       this.memory.writeUInt64(primary, obj.primaryKey);

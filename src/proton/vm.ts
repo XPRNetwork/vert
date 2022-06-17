@@ -3,14 +3,13 @@ import Buffer from "../buffer";
 import { log, Vert } from "../vert";
 import { IndexObject, KeyValueObject, SecondaryKeyStore, Table } from "./table";
 import { IteratorCache } from "./iterator-cache";
-import { Action, Name, NameType, PermissionLevel, PublicKey, Serializer, Signature, Transaction, UInt64, Checksum256, Float64 } from "@greymass/eosio";
+import { Action, Name, NameType, PermissionLevel, PublicKey, Serializer, Signature, Transaction, UInt64, Checksum256 } from "@greymass/eosio";
 import { sha256, sha512, sha1, ripemd160 } from "hash.js";
 import { bigIntToName, nameToBigInt, nameTypeToBigInt } from "./bn";
 import { Blockchain } from "./blockchain";
 import { Account } from "./account";
 import { protonAssert, protonAssertMessage, protonAssertCode } from "./errors";
-import { findLastIndex, isAuthoritySatisfied } from "./utils";
-import set from 'lodash.set'
+import { isAuthoritySatisfied } from "./utils";
 
 type ptr = number;
 type i32 = number;

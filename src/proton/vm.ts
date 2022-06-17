@@ -116,8 +116,7 @@ class VM extends Vert {
           const size = Math.min(len, this.context.data.length);
           Buffer.from_(this.memory.buffer, msg, len).set(this.context.data.subarray(0, size));
           return size;
-        }
-        ,
+        },
         action_data_size: (): i32 => {
           log.debug('action_data_size');
           return this.context.data.length;
@@ -1137,8 +1136,8 @@ class VM extends Vert {
         __negtf2: () => { throw new Error("Not implemented _negtf2") },
         __extendsftf2: (a: ptr, b: f32): void => { throw new Error("Not implemented _extendsftf2: (a: ptr, b: f32)") },
         __extenddftf2: (a: ptr, b: f64): void => { throw new Error("Not implemented _extenddftf2: (a: ptr, b: f64)") },
-        __trunctfdf2: (a: i64, b: i64): f64 => { throw new Error("Not implemented __trunctfdf2"); return 0.0; },
-        __trunctfsf2: (a: i64, b: i64): f32 => { throw new Error("Not implemented __trunctfsf2"); return 0.0; },
+        __trunctfdf2: (a: i64, b: i64): f64 => { throw new Error("Not implemented __trunctfdf2"); },
+        __trunctfsf2: (a: i64, b: i64): f32 => { throw new Error("Not implemented __trunctfsf2"); },
         __fixtfsi: () => { throw new Error("Not implemented _fixtfsi") },
         __fixtfdi: () => { throw new Error("Not implemented _fixtfdi") },
         __fixtfti: () => { throw new Error("Not implemented _fixtfti") },
@@ -1157,11 +1156,11 @@ class VM extends Vert {
         __floattidf: () => { throw new Error("Not implemented _floattidf") },
         __floatuntidf: () => { throw new Error("Not implemented _floatuntidf") },
         __cmptf2: () => { throw new Error("Not implemented _cmptf2") },
-        __eqtf2: (a: i64, b: i64, c: i64, d: i64): i32 => { return 0; },
-        __netf2: (a: i64, b: i64, c: i64, d: i64): i32 => { return 0; },
-        __getf2: (a: i64, b: i64, c: i64, d: i64): i32 => { return 0; },
+        __eqtf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __eqtf2"); },
+        __netf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __netf2"); },
+        __getf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __getf2"); },
         __gttf2: () => { throw new Error("Not implemented _gttf2") },
-        __letf2: (a: i64, b: i64, c: i64, d: i64): i32 => { return 0; },
+        __letf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __letf2"); },
         __lttf2: () => { throw new Error("Not implemented _lttf2") },
         __unordtf2: () => { throw new Error("Not implemented _unordtf2") },
       },

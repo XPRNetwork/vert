@@ -95,10 +95,24 @@ export default class Buffer extends Uint8Array {
     if (!this.view) {
       this.view = new DataView(this.buffer, this.byteOffset, this.length);
     }
+    return this.view.getFloat64(offset);
+  }
+
+  readDoubleBE(offset = 0): number {
+    if (!this.view) {
+      this.view = new DataView(this.buffer, this.byteOffset, this.length);
+    }
     return this.view.getFloat64(offset, true);
   }
 
   writeDoubleLE(value: number, offset = 0): void {
+    if (!this.view) {
+      this.view = new DataView(this.buffer, this.byteOffset, this.length);
+    }
+    this.view.setFloat64(offset, value);
+  }
+
+  writeDoubleBE(value: number, offset = 0): void {
     if (!this.view) {
       this.view = new DataView(this.buffer, this.byteOffset, this.length);
     }

@@ -1193,7 +1193,10 @@ class VM extends Vert {
         value = Checksum256.from(convertedValue).hexString
         indexType = 'idxU256'
       } else if (indexType === 'idxDouble') {
-        value = value.toString()
+        const buf = Buffer.alloc(8)
+        buf.writeDoubleLE(value)
+        value = buf.readDoubleBE().toString()
+        indexType = 'idxf64'
       }
 
       return {

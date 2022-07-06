@@ -69,7 +69,7 @@ describe('eos-vm', () => {
 
     it('create: symbol_already_exists', async () => {
       const action = eosioToken.actions.create(['alice', '100 TKN'])
-      
+
       await action.send();
 
       try {
@@ -110,8 +110,8 @@ describe('eos-vm', () => {
       const symcode = 'TKN';
 
       await eosioToken.actions.create(['alice', `1000.000 ${symcode}`]).send();
-      await eosioToken.actions.issue(['alice', `500.000 ${symcode}`, 'hola']).send('alice@active');
-      
+      await eosioToken.actions.issue(['alice', `500.000 ${symcode}`, 'hola']).send('alice');  // without @active authorization
+
       expect(getStat(symcode)).to.be.deep.equal(currency_stats('500.000 TKN', '1000.000 TKN', 'alice'))
       expect(getAccount('alice', symcode)).to.be.deep.equal(account('500.000 TKN'))
 

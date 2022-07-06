@@ -147,20 +147,50 @@ class IndexObject<K> implements IndexKey<K> {
   }
 
   static compare(a, b): number {
-    return IndexObject.compareTable(a, b) &&
-      (a.ignorePrimaryKey || b.ignorePrimaryKey)
-        ? 0
-        : ((a.primaryKey < b.primaryKey) ? -1 : (a.primaryKey > b.primaryKey) ? 1 : 0);
+    const tableComparison = IndexObject.compareTable(a, b)
+    const differentTable = tableComparison !== 0
+    if (differentTable) {
+      return tableComparison
+    }
+
+    const ignorePrimaryKey = a.ignorePrimaryKey || b.ignorePrimaryKey
+    const samePrimaryKey = a.primaryKey === b.primaryKey
+    if (ignorePrimaryKey || samePrimaryKey) {
+      return 0
+    }
+
+    return (a.primaryKey < b.primaryKey) ? -1 : 1;
   }
 
   static comparePrimitives(a, b) {
-    return IndexObject.compareTable(a, b) ||
-      ((a.secondaryKey < b.secondaryKey) ? -1 : (a.secondaryKey > b.secondaryKey) ? 1 : IndexObject.compare(a, b));
+    const tableComparison = IndexObject.compareTable(a, b)
+    const differentTable = tableComparison !== 0
+    if (differentTable) {
+      return tableComparison
+    }
+
+    const sameSecondaryKey = a.secondaryKey === b.secondaryKey
+    if (sameSecondaryKey) {
+      return IndexObject.compare(a, b)
+    }
+
+    return (a.secondaryKey < b.secondaryKey) ? -1 : 1;
   }
 
   static compareBuffer(a: IndexObject<Buffer>, b: IndexObject<Buffer>) {
-    return IndexObject.compareTable(a, b) ||
-      Buffer.compare(a.secondaryKey, b.secondaryKey) || IndexObject.compare(a, b);
+    const tableComparison = IndexObject.compareTable(a, b)
+    const sameTable = tableComparison === 0
+    if (!sameTable) {
+      return tableComparison
+    }
+
+    const bufferComparison = Buffer.compare(a.secondaryKey, b.secondaryKey)
+    const sameBuffer = bufferComparison === 0
+    if (!sameBuffer) {
+      return bufferComparison
+    }
+
+    return IndexObject.compare(a, b);
   }
 
   clone(): IndexObject<K> {

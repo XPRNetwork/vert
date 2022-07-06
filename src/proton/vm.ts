@@ -561,7 +561,7 @@ class VM extends Vert {
         db_idx128_store: (_scope: bigint, _table: bigint, _payer: bigint, _id: bigint, secondary: ptr): i32 => {
           const [scope, table, payer, id] = convertToUnsigned(_scope, _table, _payer, _id);
 
-          log.debug(`db_idx128_store: Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | Secondary ${SecondaryKeyConverter.uint128.from(Buffer.from_(this.memory.buffer, secondary, 16))}`)
+          log.debug(`db_idx128_store: Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID ${id} | Secondary ${SecondaryKeyConverter.uint128.from(Buffer.from_(this.memory.buffer, secondary, 16))}`)
 
           const itr = this.genericIndex.store(
             this.bc.store.idx128, this.idx128,
@@ -569,13 +569,13 @@ class VM extends Vert {
           return itr;
         },
         db_idx128_update: (iterator: number, _payer: bigint, secondary: ptr): void => {
-          log.debug('db_idx128_update');
+          log.debug(`db_idx128_update: Iterator ${iterator}`);
           const payer = BigInt.asUintN(64, _payer);
           this.genericIndex.update(this.bc.store.idx128, this.idx128, iterator, payer,
             Buffer.from_(this.memory.buffer, secondary, 16), SecondaryKeyConverter.uint128);
         },
         db_idx128_remove: (iterator: number): void => {
-          log.debug('db_idx128_remove');
+          log.debug(`db_idx128_remove: Iterator ${iterator}`);
           this.genericIndex.remove(this.bc.store.idx128, this.idx128, iterator);
         },
         db_idx128_find_secondary: (_code: bigint, _scope: bigint, _table: bigint, secondary: ptr, primary: ptr): i32 => {
@@ -637,13 +637,13 @@ class VM extends Vert {
           return itr;
         },
         db_idx256_update: (iterator: number, _payer: bigint, data: ptr, data_len: i32): void => {
-          log.debug('db_idx256_update');
+          log.debug(`db_idx256_update: Iterator ${iterator}`);
           const payer = BigInt.asUintN(64, _payer);
           this.genericIndex.update(this.bc.store.idx256, this.idx256, iterator, payer,
             Buffer.from_(this.memory.buffer, data, 32), SecondaryKeyConverter.checksum256);
         },
         db_idx256_remove: (iterator: number): void => {
-          log.debug('db_idx256_remove');
+          log.debug(`db_idx256_remove: Iterator ${iterator}`);
           this.genericIndex.remove(this.bc.store.idx256, this.idx256, iterator);
         },
         db_idx256_find_secondary: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, data_len: i32, primary: ptr): i32 => {
@@ -694,7 +694,7 @@ class VM extends Vert {
         db_idx_double_store: (_scope: bigint, _table: bigint, _payer: bigint, _id: bigint, secondary: ptr): i32 => {
           const [scope, table, payer, id] = convertToUnsigned(_scope, _table, _payer, _id);
   
-          log.debug(`db_idx_double_store: Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | Secondary ${SecondaryKeyConverter.double.from(Buffer.from_(this.memory.buffer, secondary, 8))}`)
+          log.debug(`db_idx_double_store: Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID: ${id} | Secondary ${SecondaryKeyConverter.double.from(Buffer.from_(this.memory.buffer, secondary, 8))}`)
 
           const itr = this.genericIndex.store(
             this.bc.store.idxDouble, this.idxDouble,
@@ -811,6 +811,11 @@ class VM extends Vert {
         // print
         prints: (msg: i32): void => {
           const str = this.memory.readString(msg)
+
+          if (str === '$vertPrintStorage') {
+            this.printStorage()
+          }
+
           log.debug('prints', str);
           this.bc.console += str;
         },
@@ -1184,25 +1189,34 @@ class VM extends Vert {
     }
 
     const convertSecondary = (indexType, value) => {
-      if (indexType === 'idx64') {
-        indexType = 'idxu64'
-      } else if (indexType === 'idx128') {
-        indexType = 'idxU128'
-      } else if (indexType === 'idx256') {
-        const convertedValue = SecondaryKeyConverter.checksum256.from(value)
-        value = Checksum256.from(convertedValue).hexString
-        indexType = 'idxU256'
-      } else if (indexType === 'idxDouble') {
-        const buf = Buffer.alloc(8)
-        buf.writeDoubleLE(value)
-        value = buf.readDoubleBE().toString()
-        indexType = 'idxf64'
-      }
-
-      return {
+      const obj: {
+        type: string,
+        value: any,
+        rawValue?: any
+      } = {
         type: indexType,
         value: value
       }
+
+      if (indexType === 'idx64') {
+        obj.type = 'idxu64'
+      } else if (indexType === 'idx128') {
+        obj.type = 'idxU128'
+        const buf = Buffer.alloc(16)
+        SecondaryKeyConverter.uint128.to(buf, value)
+        obj.rawValue = buf.slice()
+      } else if (indexType === 'idx256') {
+        const convertedValue = SecondaryKeyConverter.checksum256.from(value)
+        obj.value = Checksum256.from(convertedValue).hexString
+        obj.type = 'idxU256'
+      } else if (indexType === 'idxDouble') {
+        const buf = Buffer.alloc(8)
+        buf.writeDoubleLE(value)
+        obj.value = buf.readDoubleBE().toString()
+        obj.type = 'idxf64'
+      }
+
+      return obj
     }
 
     // Get all primary rows

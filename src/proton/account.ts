@@ -12,7 +12,7 @@ export type AccountArgs = Omit<Partial<Account>, 'name'|'abi'|'wasm'> & {
   enableInline?: boolean;
 }
 
-function isPromise(promise: any) {  
+function isPromise(promise: any) {
   return !!promise && typeof promise.then === 'function'
 }
 
@@ -82,7 +82,7 @@ export class Account {
   buildActions () {
     this.abi.actions.forEach((action) => {
       const resolved = this.abi.resolveType(action.name.toString());
-      
+
       this.actions[resolved.name] = (actionData: any[] | object) => {
         const data: Record<string, any> = {};
 
@@ -93,7 +93,7 @@ export class Account {
             if (!field.type.isOptional && !actionData.hasOwnProperty(field.name)) {
               throw new Error(`Missing field ${field.name} on action ${action.name}`);
             }
-  
+
             if (actionData.hasOwnProperty(field.name)) {
               data[field.name] = actionData[field.name]
             }
@@ -108,11 +108,13 @@ export class Account {
 
         return {
           send: async (authorization?: string | PermissionLevelType | PermissionLevelType[], options?: Partial<TransactionHeader>) => {
+            // .send()
             if (!authorization) {
-              authorization = {
-                actor: this.name,
-                permission: 'active'
-              }
+              authorization = `${this.name}@active`;
+            }
+            // .send("account")
+            else if ( typeof authorization == "string" && !authorization.includes("@") ) {
+              authorization += '@active';
             }
 
             await this.bc.applyTransaction(Transaction.from({

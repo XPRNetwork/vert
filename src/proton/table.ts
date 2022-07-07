@@ -3,8 +3,9 @@ import {log} from "../vert";
 import BTree from "sorted-btree";
 import {ABI, Name, Serializer, UInt64} from "@greymass/eosio";
 import Buffer from "../buffer";
-import { bigIntToBn, nameToBigInt } from "./bn";
+import { bigIntToBn, bnToBigInt, nameToBigInt } from "./bn";
 import { Blockchain } from "./blockchain";
+import BN from "bn.js";
 
 class KeyValueObject {
   id: number = 0;
@@ -472,15 +473,22 @@ class TableView {
     this.tab.set(primaryKey, kv)
   }
 
-  getTableRow(primaryKey: bigint): any {
+  getTableRow(primaryKey: bigint | BN): any {
+    if (BN.isBN(primaryKey)) {
+      primaryKey = bnToBigInt(primaryKey)
+    }
+    
     const value = this.get(primaryKey)
     if (value) {
       return Serializer.objectify(value)
     }
-    return
   }
 
-  getTableRows(lowerBound: bigint = BigInt(0), options: { limit?: number } = {}): any {
+  getTableRows(lowerBound: bigint | BN = BigInt(0), options: { limit?: number } = {}): any {
+    if (BN.isBN(lowerBound)) {
+      lowerBound = bnToBigInt(lowerBound)
+    }
+    
     const rows = []
     let kvNext = this.bc.store.getTableById(this.tab.id).lowerbound(lowerBound)
 

@@ -25,7 +25,7 @@ function convertToUnsigned(...values: bigint[]) {
   return values.map(v => BigInt.asUintN(64, v));
 }
 
-const SecondaryKeyConverter = {
+export const SecondaryKeyConverter = {
   uint64: {
     from: (buffer: Buffer) => buffer.readBigUInt64LE(),
     to: (buffer: Buffer, value: bigint) => buffer.writeBigUInt64LE(value),
@@ -1177,90 +1177,8 @@ class VM extends Vert {
   }
 
   private printStorage() {
-    const indexes = ['idx64', 'idx128', 'idx256', 'idxDouble']
-    const rowsByTable = {}
-
-    const secondaryTableToPrimary = (sec: string) => {
-      if (sec.length === 13) {
-        sec = sec.slice(0, -1)
-      }
-
-      return sec.replace(/\.+$/, "")
-    }
-
-    const convertSecondary = (indexType, value) => {
-      const obj: {
-        type: string,
-        value: any,
-        rawValue?: any
-      } = {
-        type: indexType,
-        value: value
-      }
-
-      if (indexType === 'idx64') {
-        obj.type = 'idxu64'
-      } else if (indexType === 'idx128') {
-        obj.type = 'idxU128'
-        const buf = Buffer.alloc(16)
-        SecondaryKeyConverter.uint128.to(buf, value)
-        obj.rawValue = buf.slice()
-      } else if (indexType === 'idx256') {
-        const convertedValue = SecondaryKeyConverter.checksum256.from(value)
-        obj.value = Checksum256.from(convertedValue).hexString
-        obj.type = 'idxU256'
-      } else if (indexType === 'idxDouble') {
-        const buf = Buffer.alloc(8)
-        buf.writeDoubleLE(value)
-        obj.value = buf.readDoubleBE().toString()
-        obj.type = 'idxf64'
-      }
-
-      return obj
-    }
-
-    // Get all primary rows
-    for (const tab of Array.from(this.bc.store.prefixesIndex.values()) as Table[]) {
-      const codeName = bigIntToName(tab.code).toString()
-      const scopeName = bigIntToName(tab.scope).toString() || '.'
-      const tableName = secondaryTableToPrimary(bigIntToName(tab.table).toString())
-
-      if (!rowsByTable[tableName]) {
-        rowsByTable[tableName] = {}
-      }
-
-      if (!rowsByTable[tableName][scopeName]) {
-        rowsByTable[tableName][scopeName] = []
-      }
-
-      let value = tab.lowerbound(tab.lowestKey())
-
-      while (value) {
-        const primaryObj = {
-          tableId: value.tableId,
-          primaryKey: value.primaryKey,
-          payer: bigIntToName(value.payer).toString(),
-          value: this.bc.accounts[codeName].tables[tableName](tab.scope).getTableRow(value.primaryKey),
-          secondaryIndexes: []
-        }
-
-        for (const index of indexes) {
-          const secondaryObj = this.bc.store[index].get({
-            tableId: value.tableId,
-            primaryKey: value.primaryKey
-          });
-
-          if (secondaryObj) {
-            primaryObj.secondaryIndexes.push(convertSecondary(index, secondaryObj.secondaryKey))
-          }
-        }
-
-        rowsByTable[tableName][scopeName].push(primaryObj)
-        value = tab.next(value.primaryKey)
-      }
-    }
-
-    console.dir(rowsByTable, { depth: null })
+    const storage = this.bc.getStorage()
+    console.dir(storage, { depth: null })
   }
 
   private findTable(code: NameType, scope: NameType, table: NameType): Table | undefined {

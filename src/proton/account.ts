@@ -1,9 +1,10 @@
 import { VM } from "./vm";
 import { TableView } from "./table";
 import { API, ABI, Name, NameType, PermissionLevel, PermissionLevelType, Serializer, Transaction, ABIDef, TransactionHeader, TimePoint } from "@greymass/eosio";
-import { nameToBigInt } from "./bn";
+import { bnToBigInt, nameToBigInt } from "./bn";
 import { Blockchain } from "./blockchain";
 import { generatePermissions, addInlinePermission } from "./utils";
+import BN from "bn.js";
 
 export type AccountArgs = Omit<Partial<Account>, 'name'|'abi'|'wasm'> & {
   name: NameType,
@@ -27,7 +28,7 @@ export class Account {
     }
   } = {};
   readonly tables: {
-    [key: string]: (scope?: bigint) => TableView
+    [key: string]: (scope?: bigint | BN) => TableView
   } = {};
   readonly permissions: API.v1.AccountPermission[] = [];
 
@@ -139,7 +140,11 @@ export class Account {
     this.abi.tables.forEach((table) => {
       const resolved = this.abi.resolveType(table.name as string);
 
-      this.tables[resolved.name] = (scope: bigint = nameToBigInt(this.name)): TableView => {
+      this.tables[resolved.name] = (scope: bigint | BN = nameToBigInt(this.name)): TableView => {
+        if (BN.isBN(scope)) {
+          scope = bnToBigInt(scope)
+        }
+        
         let tab = this.bc.store.findTable(nameToBigInt(this.name), scope, nameToBigInt(Name.from(resolved.name)));
         if (!tab) {
           tab = this.bc.store.createTable(nameToBigInt(this.name), scope, nameToBigInt(Name.from(resolved.name)), nameToBigInt(this.name))

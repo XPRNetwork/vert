@@ -1,11 +1,16 @@
-import { TableStore } from "./table";
-import { Name, Transaction, TimePoint, TimePointSec, NameType } from "@greymass/eosio";
-import { Account, AccountArgs } from "./account";
-import { VM } from "./vm";
+import { Name, Transaction, TimePoint, TimePointSec, NameType, Checksum256 } from "@greymass/eosio";
 import * as fs from "fs";
 import fetch from "cross-fetch"
+import { diff, flattenChangeset, Operation } from '../utils/diff'
+import { set } from 'lodash'
+import { Table, TableStore } from "./table";
+import { Account, AccountArgs } from "./account";
+import { SecondaryKeyConverter, VM } from "./vm";
 import { ExecutionTrace } from "./types";
 import { contextToExecutionTrace, logExecutionTrace } from "./utils";
+import { bigIntToName } from "./bn";
+import { findStartAndEnd } from '../utils/color'
+import colors from 'colors'
 
 export class Blockchain {
   accounts: { [key: string]: Account }
@@ -15,6 +20,13 @@ export class Blockchain {
   actionTraces: VM.Context[] = []
   executionTraces: ExecutionTrace[] = []
 
+  // Storage
+  isStorageDeltasEnabled: boolean = false
+  preStorage: any
+  postStorage: any
+  storageDeltaChangesets: any
+  _storageDeltas: any
+  
   constructor ({
     accounts,
     timestamp,
@@ -34,6 +46,11 @@ export class Blockchain {
 
     let actionOrdinal = -1
     let executionOrder = -1
+
+    // Take storage snapshot
+    if (this.isStorageDeltasEnabled) {
+      this.preStorage = this.getStorage()
+    }
 
     for (const action of transaction.actions) {
       const contract = this.getAccount(action.account)
@@ -81,6 +98,11 @@ export class Blockchain {
           actionsQueue = context.actionsQueue.concat(actionsQueue)
         }
       }
+    }
+
+    if (this.isStorageDeltasEnabled) {
+      this.postStorage = this.getStorage()
+      this.setStorageDeltas()
     }
   }
 
@@ -190,6 +212,9 @@ export class Blockchain {
   }
 
   async resetVm () {
+    this.preStorage = undefined
+    this.postStorage = undefined
+    this._storageDeltas = undefined
     this.actionTraces = []
     this.executionTraces = []
     await Promise.all(Object.values(this.accounts).map(account => account.recreateVm()))
@@ -201,5 +226,178 @@ export class Blockchain {
 
   public resetTables (store?: TableStore) {
     this.store = store || new TableStore()
+  }
+
+  /**
+   * Storage
+   */
+  get storageDeltas () {
+    if (!this.isStorageDeltasEnabled) {
+      throw new Error('Storage deltas are not enabled (use enableStorageDeltas)')
+    }
+
+    return this._storageDeltas
+  }
+
+  public enableStorageDeltas() {
+    this.isStorageDeltasEnabled = true
+  }
+
+  public disableStorageDeltas() {
+    this.isStorageDeltasEnabled = false
+  }
+
+  public printStorageDeltas() {
+    const stringifyWithBigInt = (json) => JSON.stringify(json, (key, value) => {
+      return typeof value === 'bigint' ? value.toString() : value
+    }, 4)
+
+    let storageDeltasJson = stringifyWithBigInt(this.storageDeltas)
+    storageDeltasJson = findStartAndEnd(storageDeltasJson, `"new":`, colors.green)
+    storageDeltasJson = findStartAndEnd(storageDeltasJson, `"old":`, colors.red)
+
+    console.log(storageDeltasJson)
+  }
+
+  public getStorage() {
+    const indexes = ['idx64', 'idx128', 'idx256', 'idxDouble']
+    const rowsByTable = {}
+
+    const secondaryTableToPrimary = (sec: string) => {
+      if (sec.length === 13) {
+        sec = sec.slice(0, -1)
+      }
+
+      return sec.replace(/\.+$/, "")
+    }
+
+    const convertSecondary = (indexType, value) => {
+      const obj: {
+        type: string,
+        value: any,
+        rawValue?: any
+      } = {
+        type: indexType,
+        value: value
+      }
+
+      if (indexType === 'idx64') {
+        obj.type = 'idxu64'
+      } else if (indexType === 'idx128') {
+        obj.type = 'idxU128'
+        const buf = Buffer.alloc(16)
+        SecondaryKeyConverter.uint128.to(buf, value)
+        obj.rawValue = buf.slice()
+      } else if (indexType === 'idx256') {
+        const convertedValue = SecondaryKeyConverter.checksum256.from(value)
+        obj.value = Checksum256.from(convertedValue).hexString
+        obj.type = 'idxU256'
+      } else if (indexType === 'idxDouble') {
+        const buf = Buffer.alloc(8)
+        buf.writeDoubleLE(value)
+        obj.value = buf.readDoubleBE().toString()
+        obj.type = 'idxf64'
+      }
+
+      return obj
+    }
+
+    // Get all primary rows
+    for (const tab of Array.from(this.store.prefixesIndex.values()) as Table[]) {
+      const codeName = bigIntToName(tab.code).toString()
+      const scopeName = bigIntToName(tab.scope).toString() || '.'
+      const tableName = secondaryTableToPrimary(bigIntToName(tab.table).toString())
+
+      if (!rowsByTable[codeName]) {
+        rowsByTable[codeName] = {}
+      }
+
+      if (!rowsByTable[codeName][tableName]) {
+        rowsByTable[codeName][tableName] = {}
+      }
+
+      if (!rowsByTable[codeName][tableName][scopeName]) {
+        rowsByTable[codeName][tableName][scopeName] = []
+      }
+
+      let value = tab.lowerbound(tab.lowestKey())
+
+      while (value) {
+        const primaryObj: {
+          primaryKey: bigint,
+          payer: string,
+          value: any,
+          secondaryIndexes?: {
+            type: string,
+            value: any,
+            rawValue?: any
+          }[]
+        } = {
+          primaryKey: value.primaryKey,
+          payer: bigIntToName(value.payer).toString(),
+          value: this.accounts[codeName].tables[tableName](tab.scope).getTableRow(value.primaryKey)
+        }
+
+        for (const index of indexes) {
+          const secondaryObj = this.store[index].get({
+            tableId: value.tableId,
+            primaryKey: value.primaryKey
+          });
+
+          if (secondaryObj) {
+            if (!primaryObj.secondaryIndexes) {
+              primaryObj.secondaryIndexes = []
+            }
+            primaryObj.secondaryIndexes.push(convertSecondary(index, secondaryObj.secondaryKey))
+          }
+        }
+
+        rowsByTable[codeName][tableName][scopeName].push(primaryObj)
+        value = tab.next(value.primaryKey)
+      }
+    }
+
+    return rowsByTable
+  }
+
+  private setStorageDeltas() {
+    this.storageDeltaChangesets = flattenChangeset(diff(this.preStorage, this.postStorage))
+
+    let parsedDiff = {}
+
+    for (const change of this.storageDeltaChangesets) {
+      change.path = change.path.slice(2).split('|')
+      const [account, table, scope, index] = change.path
+
+      if (change.type === Operation.UPDATE) {
+        set(parsedDiff, [account, table, scope, index], this.preStorage[account][table][scope][index])
+        set(parsedDiff, change.path, {
+          old: change.oldValue,
+          new: change.value
+        })
+        parsedDiff[account][table][scope] = parsedDiff[account][table][scope].filter(_ => !!_)
+      } else if (change.type === Operation.ADD) {
+        if (account) {
+          if (table) {
+            if (scope) {
+              set(parsedDiff, [account, table, scope, index], this.postStorage[account][table][scope][index])
+            } else {
+              set(parsedDiff, [account, table, scope], this.postStorage[account][table][scope])
+            }
+          } else {
+            set(parsedDiff, [account, table], this.postStorage[account][table])
+          }
+        } else {
+          parsedDiff = { ...parsedDiff, ...change.value }
+        }
+
+        set(parsedDiff, change.path, { new: change.value })
+      } else if (change.type === Operation.REMOVE) {
+        set(parsedDiff, [account, table, scope, index], this.preStorage[account][table][scope][index])
+        set(parsedDiff, change.path, { old: change.oldValue })
+      }
+    }
+
+    this._storageDeltas = parsedDiff
   }
 }

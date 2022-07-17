@@ -133,8 +133,8 @@ export class Blockchain {
    * @param {string[]} accounts - An array of account names.
    * @returns An array of accounts.
    */
-  createAccounts (...accounts: string[]) {
-    const createdAccounts = []
+  createAccounts (...accounts: string[]): Account[] {
+    const createdAccounts: Account[] = []
     for (const account of accounts) {
         createdAccounts.push(this.createAccount(account))
     }

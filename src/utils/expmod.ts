@@ -1,5 +1,4 @@
 export function expmod(a: bigint, power: bigint, modulo: bigint) {
-    console.log(a, power, modulo);
     if (power === BigInt(0)) {
         return BigInt(1) % modulo
     }

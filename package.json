@@ -1,6 +1,6 @@
 {
   "name": "@proton/vert",
-  "version": "0.3.11",
+  "version": "0.3.12",
   "homepage": "https://github.com/haderech/vert",
   "description": "VM emulation RunTime for WASM-based blockchain contracts",
   "main": "dist/index.js",
@@ -47,6 +47,7 @@
     "webpack-cli": "^4.9.2"
   },
   "dependencies": {
+    "@ethereumjs/util": "^8.0.0-beta.1",
     "@greymass/eosio": "^0.5.5",
     "bn.js": "^5.2.0",
     "brorand": "^1.1.0",
@@ -62,6 +63,7 @@
     "lodash.set": "^4.3.2",
     "loglevel": "^1.8.0",
     "loglevel-plugin-prefix": "^0.8.4",
+    "rustbn.js": "^0.2.0",
     "sorted-btree": "^1.6.0"
   }
 }

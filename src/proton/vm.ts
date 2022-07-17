@@ -1,5 +1,5 @@
 import assert from "../assert";
-import Buffer from "../buffer";
+import Buffer, { bufferToBigInt } from "../buffer";
 import { log, Vert } from "../vert";
 import { IndexObject, KeyValueObject, SecondaryKeyStore, Table } from "./table";
 import { IteratorCache } from "./iterator-cache";
@@ -12,6 +12,8 @@ import { Account } from "./account";
 import { protonAssert, protonAssertMessage, protonAssertCode } from "./errors";
 import { isAuthoritySatisfied } from "./utils";
 import { F } from "../utils/blake2";
+import { expmod } from "../utils/expmod";
+const bn128 = require('rustbn.js')
 
 type ptr = number;
 type i32 = number;
@@ -379,6 +381,83 @@ class VM extends Vert {
             .set(output)
         },
 
+        alt_bn128_add: (_op1: ptr, _op1len: i32, _op2: ptr, _op2len: i32, _result: ptr, _resultlen: i32): i32 => {
+          const op1Raw = Buffer.from_(this.memory.buffer, _op1, _op1len)
+          const op2Raw = Buffer.from_(this.memory.buffer, _op2, _op2len)
+          const input = Buffer.concat([op1Raw, op2Raw])
+
+          try {
+            const result = bn128.add(input)
+            if (result.length !== 64) {
+              return -1
+            }
+            Buffer
+              .from_(this.memory.buffer, _result, _resultlen)
+              .set(result)
+            return 0;
+          } catch (e) {
+            return -1
+          }
+        },
+
+        alt_bn128_mul: (_g1: ptr, _g1len: i32, _scalar: ptr, _scalarlen: i32, _result: ptr, _resultlen: i32): i32 => {
+          const g1Raw = Buffer.from_(this.memory.buffer, _g1, _g1len)
+          const scalarRaw = Buffer.from_(this.memory.buffer, _scalar, _scalarlen)
+          const input = Buffer.concat([g1Raw, scalarRaw])
+
+          try {
+            const result = bn128.mul(input)
+            if (result.length !== 64) {
+              return -1
+            }
+            Buffer
+              .from_(this.memory.buffer, _result, _resultlen)
+              .set(result)
+            return 0;
+          } catch (e) {
+            return -1
+          }
+        },
+
+        alt_bn128_pair: (_pairs: ptr, _pairslen: i32): i32 => {
+          const pairsRaw = Buffer.from_(this.memory.buffer, _pairs, _pairslen)
+
+          try {
+            const result = bn128.pairing(pairsRaw)
+            if (result.length !== 32) {
+              return -1
+            }
+            return result[31] === 0 ? 1 : 0;
+          } catch (e) {
+            return -1
+          }
+        },
+
+        mod_exp: (_base: ptr, _baselen: i32, _exp: ptr, _explen: i32, _mod: ptr, _modlen: i32, _result: ptr, _resultlen: i32): i32 => {
+          const baseRaw = Buffer.from_(this.memory.buffer, _base, _baselen)
+          const expRaw = Buffer.from_(this.memory.buffer, _exp, _explen)
+          const modRaw = Buffer.from_(this.memory.buffer, _mod, _modlen)
+
+          const B = bufferToBigInt(baseRaw)       
+          const E = bufferToBigInt(expRaw)     
+          const M = bufferToBigInt(modRaw)
+          
+          if (M === BigInt(0)) {
+            return -1;
+          }
+
+          try {
+            const result = expmod(B, E, M)
+            const resultBuffer = Buffer.from_(result.toString(16), 'hex')
+            Buffer
+              .from_(this.memory.buffer, _result, _resultlen)
+              .set(resultBuffer)
+            return 0;
+          } catch (e) {
+            return -1
+          }
+        },
+        
         recover_key: (digest: ptr, sig: ptr, siglen: i32, pub: ptr, publen: i32): i32 => {
           log.debug('recover_key');
           const signature = Buffer.from_(this.memory.buffer, sig, siglen);

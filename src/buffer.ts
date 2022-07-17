@@ -1,6 +1,14 @@
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+export const bufferToBigInt = (buf: Buffer): bigint => {
+  const hex = '0x' + buf.toString('hex')
+  if (hex === '0x') {
+    return BigInt(0)
+  }
+  return BigInt(hex)
+}
+
 export default class Buffer extends Uint8Array {
   view?: DataView;
 

@@ -33,6 +33,7 @@ export class Account {
   readonly permissions: API.v1.AccountPermission[] = [];
 
   public wasm?: Uint8Array;
+  public codeSequence: number = 0;
   public abi?: ABI;
   public vm?: VM;
 
@@ -76,6 +77,7 @@ export class Account {
   setContract (abi: ABIDef, wasm: Uint8Array) {
     this.abi = ABI.from(abi)
     this.wasm = wasm
+    this.codeSequence++;
     this.buildActions()
     this.buildTables()
   }

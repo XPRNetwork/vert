@@ -11,14 +11,17 @@ import { contextToExecutionTrace, logExecutionTrace } from "./utils";
 import { bigIntToName } from "./bn";
 import { findStartAndEnd } from '../utils/color'
 import colors from 'colors'
+import { ACTIVATED_PROTOCOL_FEATURES } from "../utils/activatedFeatures";
 
 export class Blockchain {
   accounts: { [key: string]: Account }
   timestamp: TimePoint
+  blockNum: number
   store: TableStore
   console: string = ''
   actionTraces: VM.Context[] = []
   executionTraces: ExecutionTrace[] = []
+  protocolFeatures: string[] = ACTIVATED_PROTOCOL_FEATURES
 
   // Storage
   isStorageDeltasEnabled: boolean = false
@@ -30,14 +33,17 @@ export class Blockchain {
   constructor ({
     accounts,
     timestamp,
-    store
+    blockNum,
+    store,
   }: {
     accounts?: { [key: string]: Account },
     timestamp?: TimePoint,
+    blockNum?: number,
     store?: TableStore
   } = {}) {
     this.accounts = accounts || {}
     this.timestamp = timestamp || TimePoint.fromMilliseconds(0)
+    this.blockNum = blockNum || 0
     this.store = store || new TableStore()
   }
 
@@ -194,13 +200,20 @@ export class Blockchain {
     this.timestamp = TimePoint.fromMilliseconds(time.toMilliseconds())
   }
   public addTime (time: TimePoint | TimePointSec) {
-    this.timestamp = TimePoint.fromMilliseconds(this.timestamp.toMilliseconds() + time.toMilliseconds())
+    const msToAdd = time.toMilliseconds()
+    this.blockNum += msToAdd / 500
+    this.timestamp = TimePoint.fromMilliseconds(this.timestamp.toMilliseconds() + msToAdd)
   }
   public subtractTime (time: TimePoint | TimePointSec) {
     if (this.timestamp.toMilliseconds() < time.toMilliseconds()) {
       throw new Error(`Blockchain time must not go negative`)
     }
-    this.timestamp = TimePoint.fromMilliseconds(this.timestamp.toMilliseconds() - time.toMilliseconds())
+    const msToSub = time.toMilliseconds()
+    this.blockNum -= msToSub / 500
+    this.timestamp = TimePoint.fromMilliseconds(this.timestamp.toMilliseconds() - msToSub)
+  }
+  public addBlocks(numberOfBlocks: number) {
+    this.addTime(TimePoint.fromMilliseconds(numberOfBlocks * 500))
   }
 
   /**

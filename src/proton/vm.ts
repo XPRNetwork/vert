@@ -13,6 +13,7 @@ import { protonAssert, protonAssertMessage, protonAssertCode } from "./errors";
 import { isAuthoritySatisfied } from "./utils";
 import { F } from "../utils/blake2";
 import { expmod } from "../utils/expmod";
+import { CodeHashResult } from "../utils/codeHash";
 const bn128 = require('rustbn.js')
 
 type ptr = number;
@@ -183,7 +184,31 @@ class VM extends Vert {
 
           return !!this.bc.getAccount(accountName)
         },
-  
+
+        get_code_hash: (_accountName: i64, _structVersion: i32, _packedResult: ptr): i32 => {
+          const [accountName] = convertToUnsigned(_accountName)
+          const account = this.bc.getAccount(bigIntToName(accountName))
+
+          const codeHashResult = Serializer.encode({
+            object: {
+              struct_version: Math.min(0, _structVersion),
+              code_sequence: account ? account.codeSequence : 0,
+              code_hash: account && account.wasm
+                ? Checksum256.hash(account.wasm)
+                : new Checksum256(new Uint8Array([])),
+              vm_type: 0,
+              vm_version: 0
+            },
+            type: CodeHashResult,
+          })
+
+          Buffer
+            .from_(this.memory.buffer, _packedResult, codeHashResult.array.length)
+            .set(codeHashResult.array)
+
+          return codeHashResult.array.length
+        },
+
         require_recipient: (name: i64): void => {  
           const [accountNameBigInt] = convertToUnsigned(name)
           const accountName = bigIntToName(accountNameBigInt)
@@ -1038,14 +1063,22 @@ class VM extends Vert {
           // HACK: throw error to stop wasm execution forcibly
           throw new EosioExitResult(code);
         },
+
+        get_block_num: (): i32 => {
+          log.debug(`get_block_num: ${this.bc.blockNum}`);
+          return this.bc.blockNum;
+        },
+
         current_time: (): i64 => {
           log.debug('current_time', BigInt(this.bc.timestamp.toMilliseconds()) * 1000n);
           return BigInt(this.bc.timestamp.toMilliseconds()) * 1000n;
         },
         is_feature_activated: (digest: ptr): boolean => {
-          log.debug('is_feature_activated');
-          throw new Error('is_feature_activated is not implemented')
-          return false;
+          const pf = new Uint8Array(this.memory.buffer, digest, 32);
+          const pfChecksum = Buffer.from_(pf).toString('hex')
+          const isFeatureActivated = this.bc.protocolFeatures.includes(pfChecksum)
+          log.debug(`is_feature_activated: ${pfChecksum} ${isFeatureActivated}`);
+          return isFeatureActivated
         },
         get_sender: (): i64 => {
           log.debug('get_sender');

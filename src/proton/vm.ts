@@ -5,11 +5,13 @@ import { IndexObject, KeyValueObject, SecondaryKeyStore, Table } from "./table";
 import { IteratorCache } from "./iterator-cache";
 import { Action, Name, NameType, PermissionLevel, PublicKey, Serializer, Signature, Transaction, UInt64, Checksum256 } from "@greymass/eosio";
 import { sha256, sha512, sha1, ripemd160 } from "hash.js";
+import { sha3_256, keccak256 } from "js-sha3"
 import { bigIntToName, nameToBigInt, nameTypeToBigInt } from "./bn";
 import { Blockchain } from "./blockchain";
 import { Account } from "./account";
 import { protonAssert, protonAssertMessage, protonAssertCode } from "./errors";
 import { isAuthoritySatisfied } from "./utils";
+import { F } from "../utils/blake2";
 
 type ptr = number;
 type i32 = number;
@@ -329,6 +331,54 @@ class VM extends Vert {
           log.debug('ripemd160');
           Buffer.from_(this.memory.buffer, hash, 20).set(new Uint8Array(ripemd160().update(Buffer.from_(this.memory.buffer, data, len)).digest()));
         },
+        sha3: (data: ptr, datalen: i32, hash: ptr, hashlen: i32, keccak: i32): void => {
+          log.debug('sha3');
+          const digestFunc = keccak ? keccak256 : sha3_256
+          const inputBuffer = Buffer.from_(this.memory.buffer, data, datalen)
+          Buffer
+            .from_(this.memory.buffer, hash, hashlen)
+            .set(new Uint8Array(digestFunc.update(inputBuffer).digest()))
+        },
+        blake2_f: (_rounds: i32, _h: ptr, _hlen: i32, _m: ptr, _mlen: i32, _t0: ptr, _t0len: i32, _t1: ptr, _t1len: i32, _final: i32, _result: ptr, _resultlen: i32): void => {
+          log.debug('blake2_f');
+
+          const rounds = _rounds
+          const f = _final
+          const hRaw = Buffer.from_(this.memory.buffer, _h, _hlen)
+          const mRaw = Buffer.from_(this.memory.buffer, _m, _mlen)
+          const t0Raw = Buffer.from_(this.memory.buffer, _t0, _t0len)
+          const t1Raw = Buffer.from_(this.memory.buffer, _t1, _t1len)
+
+          const h = new Uint32Array(16)
+          for (let i = 0; i < 16; i++) {
+            h[i] = hRaw.readUInt32LE(i * 4)
+          }
+        
+          const m = new Uint32Array(32)
+          for (let i = 0; i < 32; i++) {
+            m[i] = mRaw.readUInt32LE(i * 4)
+          }
+        
+          const t = new Uint32Array(4)
+          for (let i = 0; i < 2; i++) {
+            t[i] = t0Raw.readUInt32LE(i * 4)
+          }
+          for (let i = 0; i < 2; i++) {
+            t[i + 2] = t1Raw.readUInt32LE(i * 4)
+          }
+
+          F(h, m, t, Boolean(f), rounds)
+
+          const output = Buffer.alloc(64)
+          for (let i = 0; i < 16; i++) {
+            output.writeUInt32LE(h[i], i * 4)
+          }
+
+          Buffer
+            .from_(this.memory.buffer, _result, _resultlen)
+            .set(output)
+        },
+
         recover_key: (digest: ptr, sig: ptr, siglen: i32, pub: ptr, publen: i32): i32 => {
           log.debug('recover_key');
           const signature = Buffer.from_(this.memory.buffer, sig, siglen);
@@ -617,7 +667,7 @@ class VM extends Vert {
           return this.genericIndex.end_secondary(this.bc.store.idx128, this.idx128, code, scope, table);
         },
         db_idx128_next: (iterator: number, primary: ptr): i32 => {
-          log.debug('db_idx128_next');
+          log.debug(`db_idx128_next: Iterator ${iterator}`);
           return this.genericIndex.next_secondary(this.bc.store.idx128, this.idx128, iterator, primary);
         },
         db_idx128_previous: (iterator: number, primary: ptr): i32 => {
@@ -1046,6 +1096,19 @@ class VM extends Vert {
   
         // TODO: compiler-rt APIs
         __ashlti3: () => { throw new Error("Not implemented _ashlti3") },
+        // __ashlti3: (ret: ptr, _low: i64, _high: i64, shift: i32) => {
+        //   const [low, high] = convertToUnsigned(_low, _high);
+
+        //   const buffer = Buffer.alloc(16)
+        //   buffer.writeBigUInt64LE(low, 0);
+        //   buffer.writeBigUInt64LE(high, 8);
+
+        //   const num = SecondaryKeyConverter.int128.from(buffer)
+        //   const final = BigInt.asUintN(128, num << BigInt(shift))
+
+        //   const retBuffer = Buffer.from_(this.memory.buffer, ret, 16)
+        //   SecondaryKeyConverter.int128.to(retBuffer, final)
+        // },
         __ashrti3: () => { throw new Error("Not implemented _ashrti3") },
         __lshlti3: () => { throw new Error("Not implemented _lshlti3") },
         __lshrti3: () => { throw new Error("Not implemented _lshrti3") },
@@ -1277,6 +1340,7 @@ class VM extends Vert {
         secondaryKey: conv.from(secondary),
         ignorePrimaryKey: false,
       });
+      // console.log(obj)
       if (!obj) return ei;
       this.memory.writeUInt64(primary, obj.primaryKey);
       conv.to(secondary, obj.secondaryKey);
@@ -1298,6 +1362,7 @@ class VM extends Vert {
         secondaryKey: conv.from(secondary),
         ignorePrimaryKey: false,
       });
+      // console.log(obj)
       if (!obj) return ei;
       this.memory.writeUInt64(primary, obj.primaryKey);
       conv.to(secondary, obj.secondaryKey);
@@ -1339,6 +1404,7 @@ class VM extends Vert {
         const tab = cache.findTableByEndIterator(iterator);
         assert(tab, 'not a valid end iterator');
         const obj = index.secondary.penultimate(tab.id);
+        // console.log(obj)
         if (!obj) {
           return -1;
         }

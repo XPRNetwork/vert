@@ -84,6 +84,20 @@ export default class Buffer extends Uint8Array {
     this.view.setBigUint64(offset, value, true);
   }
 
+  readUInt32LE(offset = 0): number {
+    if (!this.view) {
+      this.view = new DataView(this.buffer, this.byteOffset, this.length);
+    }
+    return this.view.getUint32(offset, true);
+  }
+
+  writeUInt32LE(value: number, offset = 0): void{
+    if (!this.view) {
+      this.view = new DataView(this.buffer, this.byteOffset, this.length);
+    }
+    this.view.setUint32(offset, value, true);
+  }
+
   writeBigUInt64BE(value: bigint, offset = 0): void {
     if (!this.view) {
       this.view = new DataView(this.buffer, this.byteOffset, this.length);

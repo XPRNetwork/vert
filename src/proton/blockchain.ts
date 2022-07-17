@@ -368,6 +368,28 @@ export class Blockchain {
     for (const change of this.storageDeltaChangesets) {
       change.path = change.path.slice(2).split('|')
       const [account, table, scope, index] = change.path
+      // console.log(account, table, scope, index, change.type, change.key)
+      const fill = (storage: any) => {
+        let path = []
+        if (account) {
+          if (table) {
+            if (scope) {
+              path = [account, table, scope, index]
+              set(parsedDiff, path, storage[account][table][scope][index])
+            } else {
+              path = [account, table, change.key]
+              set(parsedDiff, [account, table, change.key], storage[account][table][change.key])
+            }
+          } else {
+            path = [account, change.key]
+            set(parsedDiff, path, storage[account][change.key])
+          }
+        } else {
+          path = [change.key]
+          parsedDiff = { ...parsedDiff, ...change.value }
+        }
+        return path
+      }
 
       if (change.type === Operation.UPDATE) {
         set(parsedDiff, [account, table, scope, index], this.preStorage[account][table][scope][index])
@@ -377,24 +399,11 @@ export class Blockchain {
         })
         parsedDiff[account][table][scope] = parsedDiff[account][table][scope].filter(_ => !!_)
       } else if (change.type === Operation.ADD) {
-        if (account) {
-          if (table) {
-            if (scope) {
-              set(parsedDiff, [account, table, scope, index], this.postStorage[account][table][scope][index])
-            } else {
-              set(parsedDiff, [account, table, scope], this.postStorage[account][table][scope])
-            }
-          } else {
-            set(parsedDiff, [account, table], this.postStorage[account][table])
-          }
-        } else {
-          parsedDiff = { ...parsedDiff, ...change.value }
-        }
-
-        set(parsedDiff, change.path, { new: change.value })
+        const path = fill(this.postStorage)
+        set(parsedDiff, path, { new: change.value })
       } else if (change.type === Operation.REMOVE) {
-        set(parsedDiff, [account, table, scope, index], this.preStorage[account][table][scope][index])
-        set(parsedDiff, change.path, { old: change.oldValue })
+        // fill(this.preStorage)
+        // set(parsedDiff, change.path, { old: change.value })
       }
     }
 

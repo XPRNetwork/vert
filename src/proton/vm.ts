@@ -14,6 +14,7 @@ import { isAuthoritySatisfied } from "./utils";
 import { F } from "../utils/blake2";
 import { expmod } from "../utils/expmod";
 import { CodeHashResult } from "../utils/codeHash";
+import { recoverUncompressedDigest } from "../utils/curve";
 const bn128 = require('rustbn.js')
 
 type ptr = number;
@@ -513,7 +514,36 @@ class VM extends Vert {
             PublicKey.from({ type: 'K1', compressed: publicKey.slice(1) })
           ), 'recovered key is different from expected one');
         },
-  
+
+        k1_recover: (sig: ptr, siglen: i32, dig: ptr, diglen: i32, pub: ptr, publen: i32): i32 => {
+          log.debug('k1_recover');
+          const sigBuffer = Buffer.from_(this.memory.buffer, sig, siglen);
+          const digBuffer = Buffer.from_(this.memory.buffer, dig, diglen);
+          if (sigBuffer.length != 65 || digBuffer.length != 32) {
+            return -1;
+          }
+
+          let recid = sigBuffer[0];
+          if (recid < 27 || recid >= 35) {
+            return -1;
+          }
+          recid = (recid - 27) & 0x3;
+
+          try {
+            const signature = Signature.from({
+              type: 'K1',
+              r: sigBuffer.slice(1, 33),
+              s: sigBuffer.slice(33, 65),
+              recid,
+            })
+            const publicKey = recoverUncompressedDigest(signature, digBuffer)
+            Buffer.from_(this.memory.buffer, pub, publen).set(publicKey.slice(0, publen));
+            return 0;
+          } catch (e) {
+            return -1
+          }
+        },
+
         // db
         db_store_i64: (_scope: i64, _table: i64, _payer: i64, _id: i64, data: ptr, len: i32): i32 => {
           const [scope, table, payer, id] = convertToUnsigned(_scope, _table, _payer, _id);

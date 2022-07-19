@@ -196,7 +196,7 @@ class VM extends Vert {
               code_sequence: account ? account.codeSequence : 0,
               code_hash: account && account.wasm
                 ? Checksum256.hash(account.wasm)
-                : new Checksum256(new Uint8Array([])),
+                : new Checksum256(new Uint8Array(new Array(32).fill(0))),
               vm_type: 0,
               vm_version: 0
             },
@@ -302,10 +302,10 @@ class VM extends Vert {
           log.debug('current_receiver');
           return BigInt.asIntN(64, this.context.receiver.toBigInt());
         },
+
         set_action_return_value: (value: ptr, size: i32): void => {
           log.debug('set_action_return_value');
-          // TODO
-          throw new Error('set_action_return_value is not implemented')
+          this.context.returnValue = Buffer.from_(this.memory.buffer, value, size)
         },
   
         // chain
@@ -475,7 +475,6 @@ class VM extends Vert {
           try {
             const result = expmod(B, E, M)
             const resultBuffer = readBufferFromBigInt(result, 32, false)
-
             Buffer
               .from_(this.memory.buffer, _result, _resultlen)
               .set(resultBuffer)
@@ -1655,6 +1654,7 @@ namespace VM {
     receiver: Account;
     action: Name;
     data: Uint8Array;
+    returnValue: Uint8Array;
     authorization: PermissionLevel[] = [];
     actionsQueue: VM.Context[] = [];
     notificationsQueue: VM.Context[] = [];

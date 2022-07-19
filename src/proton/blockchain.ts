@@ -12,6 +12,7 @@ import { bigIntToName } from "./bn";
 import { findStartAndEnd } from '../utils/color'
 import colors from 'colors'
 import { ACTIVATED_PROTOCOL_FEATURES } from "../utils/activatedFeatures";
+import Buffer from '../buffer'
 
 export class Blockchain {
   accounts: { [key: string]: Account }
@@ -157,7 +158,7 @@ export class Blockchain {
         return fs.readFileSync(fileName)
     } else {
         const res = await fetch(fileName)
-        return Buffer.from(await res.arrayBuffer())
+        return new Uint8Array(await res.arrayBuffer())
     }
   }
 

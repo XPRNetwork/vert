@@ -1,12 +1,45 @@
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+
 export const bufferToBigInt = (buf: Buffer): bigint => {
   const hex = '0x' + buf.toString('hex')
   if (hex === '0x') {
     return BigInt(0)
   }
   return BigInt(hex)
+}
+
+/**
+ * converts a big int to a buffer
+ * @param bigIntVar {BigInteger}
+ * @param bytesNumber
+ * @param little
+ * @param signed
+ * @returns {Buffer}
+ */
+ export function readBufferFromBigInt(
+  bigIntVar: bigint,
+  bytesNumber: number,
+  little: boolean,
+): Buffer {
+  const bitLength = bigIntVar.toString(2).length;
+
+  const bytes = Math.ceil(bitLength / 8);
+  if (bytesNumber < bytes) {
+      throw new Error("OverflowError: int too big to convert");
+  }
+  if (bigIntVar < BigInt(0)) {
+      throw new Error("Cannot convert to unsigned");
+  }
+
+  const hex = bigIntVar.toString(16).padStart(bytesNumber * 2, "0");
+  let littleBuffer = new Uint8Array(Buffer.from_(hex, "hex").buffer);
+  if (little) {
+      littleBuffer = littleBuffer.reverse();
+  }
+  
+  return Buffer.from_(littleBuffer);
 }
 
 export default class Buffer extends Uint8Array {

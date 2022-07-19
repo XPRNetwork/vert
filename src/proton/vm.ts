@@ -1,5 +1,5 @@
 import assert from "../assert";
-import Buffer, { bufferToBigInt } from "../buffer";
+import Buffer, { bufferToBigInt, readBufferFromBigInt } from "../buffer";
 import { log, Vert } from "../vert";
 import { IndexObject, KeyValueObject, SecondaryKeyStore, Table } from "./table";
 import { IteratorCache } from "./iterator-cache";
@@ -474,7 +474,8 @@ class VM extends Vert {
 
           try {
             const result = expmod(B, E, M)
-            const resultBuffer = Buffer.from_(result.toString(16), 'hex')
+            const resultBuffer = readBufferFromBigInt(result, 32, false)
+
             Buffer
               .from_(this.memory.buffer, _result, _resultlen)
               .set(resultBuffer)

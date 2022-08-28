@@ -1,6 +1,6 @@
 {
   "name": "@proton/vert",
-  "version": "0.3.19",
+  "version": "0.3.20",
   "homepage": "https://github.com/haderech/vert",
   "description": "VM emulation RunTime for WASM-based blockchain contracts",
   "main": "dist/index.js",

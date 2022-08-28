@@ -412,6 +412,22 @@ class VM extends Vert {
           const op2Raw = Buffer.from_(this.memory.buffer, _op2, _op2len)
           const input = Buffer.concat([op1Raw, op2Raw])
 
+          log.debug(`alt_bn128_add: 
+          Op1x:
+            ${bufferToBigInt(Buffer.from_(op1Raw.slice(0, 32)))}
+            ${Buffer.from_(op1Raw.slice(0, 32)).toString('hex')}
+          Op1y:
+            ${bufferToBigInt(Buffer.from_(op1Raw.slice(32)))}
+            ${Buffer.from_(op1Raw.slice(32)).toString('hex')}
+          Op2x:
+            ${bufferToBigInt(Buffer.from_(op2Raw.slice(0, 32)))}
+            ${Buffer.from_(op2Raw.slice(0, 32)).toString('hex')}
+          Op2y:
+            ${bufferToBigInt(Buffer.from_(op2Raw.slice(32)))}
+            ${Buffer.from_(op2Raw.slice(32)).toString('hex')}
+          `);
+
+
           try {
             const result = bn128.add(input)
             if (result.length !== 64) {
@@ -431,6 +447,18 @@ class VM extends Vert {
           const scalarRaw = Buffer.from_(this.memory.buffer, _scalar, _scalarlen)
           const input = Buffer.concat([g1Raw, scalarRaw])
 
+          log.debug(`alt_bn128_mul: 
+            G1x:
+              ${bufferToBigInt(Buffer.from_(g1Raw.slice(0, 32)))}
+              ${Buffer.from_(g1Raw.slice(0, 32)).toString('hex')}
+            G1y:
+              ${bufferToBigInt(Buffer.from_(g1Raw.slice(32)))}
+              ${Buffer.from_(g1Raw.slice(32)).toString('hex')}
+            Scalar:
+              ${bufferToBigInt(scalarRaw)}
+              ${scalarRaw.toString('hex')}
+            `);
+
           try {
             const result = bn128.mul(input)
             if (result.length !== 64) {
@@ -446,6 +474,8 @@ class VM extends Vert {
         },
 
         alt_bn128_pair: (_pairs: ptr, _pairslen: i32): i32 => {
+          log.debug(`alt_bn128_pair`);
+          
           const pairsRaw = Buffer.from_(this.memory.buffer, _pairs, _pairslen)
 
           try {
@@ -460,6 +490,8 @@ class VM extends Vert {
         },
 
         mod_exp: (_base: ptr, _baselen: i32, _exp: ptr, _explen: i32, _mod: ptr, _modlen: i32, _result: ptr, _resultlen: i32): i32 => {
+          log.debug(`mod_exp`);
+          
           const baseRaw = Buffer.from_(this.memory.buffer, _base, _baselen)
           const expRaw = Buffer.from_(this.memory.buffer, _exp, _explen)
           const modRaw = Buffer.from_(this.memory.buffer, _mod, _modlen)
@@ -1502,7 +1534,7 @@ class VM extends Vert {
         tableId: tab.id,
         primaryKey: 0n,
         secondaryKey: conv.from(secondary),
-        ignorePrimaryKey: false,
+        ignorePrimaryKey: true,
       });
       // console.log(obj)
       if (!obj) return ei;

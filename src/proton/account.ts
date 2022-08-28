@@ -30,8 +30,8 @@ export class Account {
   readonly tables: {
     [key: string]: (scope?: bigint | BN) => TableView
   } = {};
-  readonly permissions: API.v1.AccountPermission[] = [];
 
+  public permissions: API.v1.AccountPermission[] = [];
   public wasm?: Uint8Array;
   public codeSequence: number = 0;
   public abi?: ABI;
@@ -80,6 +80,10 @@ export class Account {
     this.codeSequence++;
     this.buildActions()
     this.buildTables()
+  }
+
+  setPermissions (permissions: API.v1.AccountPermission[]) {
+    this.permissions = permissions
   }
 
   buildActions () {

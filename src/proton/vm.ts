@@ -15,6 +15,7 @@ import { F } from "../utils/blake2";
 import { expmod } from "../utils/expmod";
 import { CodeHashResult } from "../utils/codeHash";
 import { recoverUncompressedDigest } from "../utils/curve";
+import * as bigintConversion from 'bigint-conversion'
 const bn128 = require('rustbn.js')
 
 type ptr = number;
@@ -99,7 +100,6 @@ class VM extends Vert {
   private idxDouble = new IteratorCache<IndexObject<number>>();
 
   // private idxLongDouble;
-  private snapshot: number = 0;
   private bc: Blockchain
   public imports
 
@@ -1389,14 +1389,32 @@ class VM extends Vert {
         __fixsfti: () => { throw new Error("Not implemented _fixsfti") },
         __fixdfti: () => { throw new Error("Not implemented _fixdfti") },
         __fixunssfti: () => { throw new Error("Not implemented _fixunssfti") },
-        __fixunsdfti: () => { throw new Error("Not implemented _fixunsdfti") },
+        __fixunsdfti: (_a: ptr, _b: f64) => {
+
+          const buf = Buffer.alloc(8)
+          SecondaryKeyConverter.double.to(buf, _b)
+
+          SecondaryKeyConverter.uint64.from(buf)
+          // console.log(a, b)
+          
+          throw new Error("Not implemented _fixunsdfti")
+        },
         __floatsidf: () => { throw new Error("Not implemented _floatsidf") },
         __floatsitf: (a: ptr, b: i32): void => { throw new Error("Not implemented _floatsitf: (a: ptr, b: i32)") },
         __floatditf: () => { throw new Error("Not implemented _floatditf") },
         __floatunsitf: (a: ptr, b: i32): void => { throw new Error("Not implemented _floatunsitf: (a: ptr, b: i32)") },
         __floatunditf: () => { throw new Error("Not implemented _floatunditf") },
         __floattidf: () => { throw new Error("Not implemented _floattidf") },
-        __floatuntidf: () => { throw new Error("Not implemented _floatuntidf") },
+
+        __floatuntidf: (_la: i64, _ha: i64) => {
+          const [la, ha] = convertToUnsigned(_la, _ha);
+          let lhs: i128 = BigInt(ha)
+          lhs = BigInt.asUintN(128, lhs << BigInt(64));
+          lhs = BigInt.asUintN(128, lhs | la);
+
+          return Number(lhs)
+        },
+
         __cmptf2: () => { throw new Error("Not implemented _cmptf2") },
         __eqtf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __eqtf2"); },
         __netf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __netf2"); },
@@ -1616,7 +1634,6 @@ class VM extends Vert {
   };
 
   apply(context: VM.Context) {
-    this.snapshot = this.bc.store.snapshot();
     this.context = context;
     
     // Check authorization
@@ -1653,17 +1670,10 @@ class VM extends Vert {
         nameToBigInt(this.context.action)
       );
     } catch (e) {
-      if (!(e instanceof EosioExitResult)) {
-        this.revert();
-        throw e;
-      }
+      throw e
     } finally {
       this.finalize();
     }
-  }
-
-  revert() {
-    this.bc.store.revertTo(this.snapshot);
   }
 
   finalize() {

@@ -48,16 +48,9 @@ export class Blockchain {
     this.store = store || new TableStore()
   }
 
-  public async applyTransaction (transaction: Transaction, decodedData?: any) {
-    await this.resetTransaction()
-
+  private applyTransactionActions(transaction: Transaction, decodedData?: any) {
     let actionOrdinal = -1
     let executionOrder = -1
-
-    // Take storage snapshot
-    if (this.isStorageDeltasEnabled) {
-      this.preStorage = this.getStorage()
-    }
 
     for (const action of transaction.actions) {
       const contract = this.getAccount(action.account)
@@ -105,6 +98,26 @@ export class Blockchain {
           actionsQueue = context.actionsQueue.concat(actionsQueue)
         }
       }
+    }
+  }
+
+  public async applyTransaction (transaction: Transaction, decodedData?: any) {
+    await this.resetTransaction()
+
+    // Take blockchain snapshot
+    const snapshot = this.store.snapshot();
+
+    // Take storage snapshot
+    if (this.isStorageDeltasEnabled) {
+      this.preStorage = this.getStorage()
+    }
+
+    try {
+      this.applyTransactionActions(transaction, decodedData)
+    } catch (e) {
+      // Revert back to pre-transaction
+      this.store.revertTo(snapshot);
+      throw e;
     }
 
     if (this.isStorageDeltasEnabled) {

@@ -1,7 +1,7 @@
 import {CreateItemChange, DeleteItemChange, PrefixedStore, Store, StoreChange} from "../store";
 import {log} from "../vert";
 import BTree from "sorted-btree";
-import {ABI, Name, Serializer, UInt64} from "@greymass/eosio";
+import {ABI, Name, Serializer, UInt64, NameType} from "@greymass/eosio";
 import Buffer from "../buffer";
 import { bigIntToBn, bnToBigInt, nameToBigInt } from "./bn";
 import { Blockchain } from "./blockchain";
@@ -435,7 +435,7 @@ class TableView {
     private abi: ABI,
     private bc: Blockchain
   ) {
-    this.name = Name.from(UInt64.from(bigIntToBn(this.tab.table))).toString();
+    this.name = Name.from(UInt64.from(bigIntToBn(this.tab.table)) as NameType).toString();
     this.type = this.abi.tables.find((table) => table.name === this.name);
   }
 

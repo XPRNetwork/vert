@@ -275,17 +275,19 @@ class VM extends Vert {
           if (!contract || !contract.isContract) {
             throw new Error(`Contract ${decodedAction.account} is missing for inline action`)
           }
-  
-          const context = new VM.Context({
-            sender: this.context.receiver.name,
-            receiver: contract,
-            firstReceiver: contract,
-            action: decodedAction.name,
-            data: decodedAction.data.array.slice(),
-            decodedData: decodedAction.decodeData(contract.abi) as any,
-            authorization: decodedAction.authorization
-          })
-          this.context.actionsQueue.push(context)
+
+          if (contract.actions[decodedAction.name.toString()]) {
+            const context = new VM.Context({
+              sender: this.context.receiver.name,
+              receiver: contract,
+              firstReceiver: contract,
+              action: decodedAction.name,
+              data: decodedAction.data.array.slice(),
+              decodedData: decodedAction.decodeData(contract.abi) as any,
+              authorization: decodedAction.authorization
+            })
+            this.context.actionsQueue.push(context)
+          }
         },
         send_context_free_inline: (action: ptr, size: i32): void => {
           log.debug('send_context_free_inline');

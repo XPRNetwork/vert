@@ -14,7 +14,7 @@ export function nameToBigInt (name: NameType): bigint {
 }
 
 export function bigIntToName (name: bigint): Name {
-    return Name.from(UInt64.from(bigIntToBn(name)))
+    return Name.from(UInt64.from(bigIntToBn(name)) as NameType)
 }
 
 export function nameTypeToBigInt (nameType: NameType): bigint {

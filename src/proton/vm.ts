@@ -1474,7 +1474,9 @@ class VM extends Vert {
       iterator: number, payer: bigint, secondary: Buffer, conv
     ) => {
       const obj = cache.get(iterator);
-      const tab = cache.getTable(obj.tableId);
+      const tab = this.bc.store.getTableById(obj.tableId);
+      assert(tab, 'table not found for secondary index update');
+      cache.cacheTable(tab);
       assert(tab.code === this.context.receiver.toBigInt(), 'db access violation');
       if (payer === 0n) {
         payer = obj.payer;
@@ -1491,7 +1493,9 @@ class VM extends Vert {
       iterator: number
     ) => {
       const obj = cache.get(iterator);
-      const tab = cache.getTable(obj.tableId);
+      const tab = this.bc.store.getTableById(obj.tableId);
+      assert(tab, 'table not found for secondary index remove');
+      cache.cacheTable(tab);
       assert(tab.code === this.context.receiver.toBigInt(), 'db access violation');
       index.delete(obj);
       cache.remove(iterator);

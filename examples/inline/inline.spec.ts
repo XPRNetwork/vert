@@ -1,8 +1,13 @@
 import fs from "fs";
 import path from "path";
 import { expect } from "chai";
-import { Blockchain } from "../../dist";
+import { Account, Blockchain } from "../../dist";
 import { Name, PermissionLevel, Serializer, Transaction, UInt64 } from "@greymass/eosio"
+
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const blockchain = new Blockchain()
 
@@ -13,7 +18,7 @@ const strToAccount = (str: string) => blockchain.createAccount({
   enableInline: true
 })
 
-const accounts = {}
+const accounts: Record<string, Account> = {}
 const accountz = ['r1', 'r2', 'i11', 'i14', 'i21', 'i112', 'i121', 'i131', 'i141', 'i1211', 'i1222', 'n12', 'n13', 'n22', 'n111', 'n122', 'n132', 'n142', 'n1212', 'n1221']
 
 for (const account of accountz) {

@@ -4,13 +4,18 @@ import { expect } from "chai";
 import { Name } from "@greymass/eosio"
 import { Blockchain, nameToBigInt } from "../../dist";
 
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const blockchain = new Blockchain()
 
 const contractName = Name.from('test')
 const fixtures = blockchain.createAccount({
   name: contractName,
-  wasm: fs.readFileSync(path.join(__dirname, '/fixtures.wasm')),
-  abi: fs.readFileSync(path.join(__dirname, '/fixtures.abi'), 'utf8')
+  wasm: fs.readFileSync(path.join(__dirname, 'fixtures.wasm')),
+  abi: fs.readFileSync(path.join(__dirname, 'fixtures.abi'), 'utf8')
 });
 
 interface Row {

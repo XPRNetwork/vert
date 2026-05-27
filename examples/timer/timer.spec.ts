@@ -4,6 +4,11 @@ import { expect } from "chai";
 import { Name, TimePoint } from "@greymass/eosio"
 import { Blockchain } from "../../dist";
 
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const blockchain = new Blockchain()
 
 const timeName = Name.from('time')

@@ -1,7 +1,7 @@
-import {CreateItemChange, DeleteItemChange, PrefixedStore, Store, StoreChange} from "../store";
+import {CreateItemChange, DeleteItemChange, PrefixedStore, Store, type StoreChange} from "../store";
 import {log} from "../vert";
 import BTree from "sorted-btree";
-import {ABI, Name, Serializer, UInt64, NameType} from "@greymass/eosio";
+import {ABI, Name, Serializer, UInt64, type NameType} from "@greymass/eosio";
 import Buffer from "../buffer";
 import { bigIntToBn, bnToBigInt, nameToBigInt } from "./bn";
 import { Blockchain } from "./blockchain";
@@ -9,10 +9,10 @@ import BN from "bn.js";
 
 class KeyValueObject {
   id: number = 0;
-  tableId: number;
-  primaryKey: bigint;
-  payer: bigint;
-  value: Uint8Array;
+  tableId: number = 0;
+  primaryKey: bigint = 0n;
+  payer: bigint = 0n;
+  value: Uint8Array = new Uint8Array();
 
   constructor (args: Partial<KeyValueObject>) {
     Object.assign(this, args)
@@ -35,13 +35,13 @@ class Table extends PrefixedStore<bigint,KeyValueObject> {
   private _code: bigint;
   private _scope: bigint;
   private _table: bigint;
-  private payer: bigint;
+  // private payer: bigint;
   private _prefix?: Buffer;
   private seq = 0;
   private _size = 0;
 
   static serializePrefix(code: bigint, scope: bigint, table: bigint): Buffer {
-    let buf = Buffer.alloc(24);
+    const buf = Buffer.alloc(24);
     buf.writeBigUInt64BE(code);
     buf.writeBigUInt64BE(scope, 8);
     buf.writeBigUInt64BE(table, 16);
@@ -59,7 +59,7 @@ class Table extends PrefixedStore<bigint,KeyValueObject> {
     this._code = options.code;
     this._scope = options.scope;
     this._table = options.table;
-    this.payer = options.payer;
+    // this.payer = options.payer;
     this._prefix = options.prefix;
   }
 
@@ -134,20 +134,21 @@ class Table extends PrefixedStore<bigint,KeyValueObject> {
 }
 
 class IndexObject<K> implements IndexKey<K> {
-  tableId: number;
-  primaryKey: bigint;
-  payer: bigint;
-  secondaryKey: K;
+  tableId: number = 0;
+  primaryKey: bigint = 0n;
+  payer: bigint = 0n;
+  secondaryKey!: K;
+  ignorePrimaryKey?: boolean;
 
   constructor (args: Partial<IndexObject<K>>) {
     Object.assign(this, args)
   }
 
-  static compareTable(a, b) {
+  static compareTable(a: IndexObject<unknown>, b: IndexObject<unknown>) {
     return (a.tableId < b.tableId) ? -1 : (a.tableId > b.tableId) ? 1 : 0;
   }
 
-  static compare(a, b): number {
+  static compare(a: IndexObject<unknown>, b: IndexObject<unknown>): number {
     const tableComparison = IndexObject.compareTable(a, b)
     const differentTable = tableComparison !== 0
     if (differentTable) {
@@ -163,7 +164,7 @@ class IndexObject<K> implements IndexKey<K> {
     return (a.primaryKey < b.primaryKey) ? -1 : 1;
   }
 
-  static comparePrimitives(a, b) {
+  static comparePrimitives(a: any, b: any) {
     const tableComparison = IndexObject.compareTable(a, b)
     const differentTable = tableComparison !== 0
     if (differentTable) {
@@ -209,7 +210,7 @@ interface IndexPrimaryKey {
 }
 
 interface IndexKey<K> extends IndexPrimaryKey {
-  secondaryKey: K;
+  secondaryKey?: K;
   ignorePrimaryKey?: boolean;
 }
 
@@ -217,7 +218,10 @@ class SecondaryKeyStore<K> {
   byPrimary: BTree<IndexPrimaryKey,IndexObject<K>>;
   bySecondary: BTree<IndexKey<K>,IndexObject<K>>;
 
-  constructor(private parent: TableStore, comparePrimary, compareSecondary) {
+  private parent: TableStore
+
+  constructor(parent: TableStore, comparePrimary: any, compareSecondary: any) {
+    this.parent = parent
     this.byPrimary = new BTree<IndexPrimaryKey,IndexObject<K>>(undefined, comparePrimary);
     this.bySecondary = new BTree<IndexKey<K>,IndexObject<K>>(undefined, compareSecondary);
   }
@@ -251,7 +255,7 @@ class SecondaryKeyStore<K> {
   next(key: IndexPrimaryKey) {
     const kv = this.byPrimary.nextHigherPair(key);
     if (kv) {
-      const [_, value] = kv;
+      const [, value] = kv;
       if (value.tableId === key.tableId) {
         return value;
       }
@@ -271,8 +275,8 @@ class SecondaryKeyStore<K> {
   }
 
   secondary = {
-    lowest: undefined,
-    highest: undefined,
+    lowest: undefined as any | undefined,
+    highest: undefined as any | undefined,
     get: (key: IndexKey<K>) => {
       return this.bySecondary.get(key);
     },
@@ -280,7 +284,7 @@ class SecondaryKeyStore<K> {
       const highestKey: IndexKey<K> = {
         tableId,
         primaryKey: BigInt.asUintN(64, -1n),
-        secondaryKey: this.secondary.highest,
+        secondaryKey: this.secondary.highest as K,
       };
       const idx = this.secondary.get(highestKey);
       if (idx) {
@@ -300,7 +304,7 @@ class SecondaryKeyStore<K> {
     prev: (key: IndexKey<K>) => {
       const kv = this.bySecondary.nextLowerPair(key);
       if (kv) {
-        const [_, value] = kv;
+        const [, value] = kv;
         if (value.tableId === key.tableId) {
           return value;
         }
@@ -310,7 +314,7 @@ class SecondaryKeyStore<K> {
     next: (key: IndexKey<K>) => {
       const kv = this.bySecondary.nextHigherPair(key);
       if (kv) {
-        const [_, value] = kv;
+        const [, value] = kv;
         if (value.tableId === key.tableId) {
           return value;
         }
@@ -323,8 +327,10 @@ class SecondaryKeyStore<K> {
 class Index64 extends SecondaryKeyStore<bigint> {
   constructor(store: TableStore) {
     super(store, IndexObject.compare, IndexObject.comparePrimitives);
-    this.secondary.lowest = 0n;
-    this.secondary.highest = BigInt.asUintN(64, -1n);
+    if(this.secondary) {
+      this.secondary.lowest = 0n;
+      this.secondary.highest = BigInt.asUintN(64, -1n);
+    }
   }
 }
 
@@ -354,11 +360,12 @@ class IndexDouble extends SecondaryKeyStore<number> {
 
 class CreateSecondaryKeyChange implements StoreChange {
   key: any;
-  keystore: SecondaryKeyStore<any>;
+  keystore!: SecondaryKeyStore<any>;
   constructor(init?: Partial<CreateSecondaryKeyChange>) {
     Object.assign(this, init);
   }
-  revert(store) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  revert(_: any) {
     log.debug(`revert secondary key ${this.key.primaryKey} creation.`);
     if (!this.keystore.get(this.key)) {
       throw new Error('revert stack is corrupted');
@@ -370,11 +377,12 @@ class CreateSecondaryKeyChange implements StoreChange {
 class UpdateSecondaryKeyChange implements StoreChange {
   key: any;
   newKey: any;
-  keystore: SecondaryKeyStore<any>;
+  keystore!: SecondaryKeyStore<any>;
   constructor(init?: Partial<UpdateSecondaryKeyChange>) {
     Object.assign(this, init);
   }
-  revert(store) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  revert(_: any) {
     log.debug('revert secondary key update');
     if (!this.keystore.get(this.newKey)) {
       throw new Error('revert stack is corrupted');
@@ -385,11 +393,12 @@ class UpdateSecondaryKeyChange implements StoreChange {
 
 class DeleteSecondaryKeyChange implements StoreChange {
   key: any;
-  keystore: SecondaryKeyStore<any>;
+  keystore!: SecondaryKeyStore<any>;
   constructor(init?: Partial<DeleteSecondaryKeyChange>) {
     Object.assign(this, init);
   }
-  revert(store) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  revert(_: any) {
     log.debug('revert secondary key deletion');
     if (this.keystore.get(this.key)) {
       throw new Error('revert stack is corrupted');
@@ -430,13 +439,22 @@ class TableView {
   readonly name: string;
   readonly type: ABI.Table
 
-  constructor(
-    private tab: Table,
-    private abi: ABI,
+
+  private tab: Table
+    private abi: ABI
     private bc: Blockchain
+
+  constructor(
+    tab: Table,
+    abi: ABI,
+    bc: Blockchain
   ) {
+    this.tab = tab
+    this.abi = abi
+    this.bc = bc
+
     this.name = Name.from(UInt64.from(bigIntToBn(this.tab.table)) as NameType).toString();
-    this.type = this.abi.tables.find((table) => table.name === this.name);
+    this.type = this.abi.tables.find((table) => table.name === this.name) as ABI.Table;
   }
 
   get(primaryKey: bigint): any {

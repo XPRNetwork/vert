@@ -9,11 +9,11 @@ interface TableEndIterator {
 class IteratorCache<T> {
   private tableCache = new Map<number, TableEndIterator>();
   private endIteratorToTable = new Array<Table>();
-  private iteratorToObject = new Array<T>();
+  private iteratorToObject = new Array<T | undefined>();
   private objectToIterator = new Map<T, number>();
 
   cacheTable(table: Table): number {
-    for (const [key, value] of this.tableCache) {
+    for (const [, value] of this.tableCache) {
       if (table === value[0]) {
         return value[1];
       }
@@ -27,13 +27,13 @@ class IteratorCache<T> {
   getTable(id: number): Table {
     const found = this.tableCache.get(id);
     assert(found, 'an invariant was broken, table should be in cache');
-    return found[0];
+    return found?.[0] as Table;
   }
 
   getEndIteratorByTableId(id: number): number {
     const found = this.tableCache.get(id);
     assert(found, 'an invariant was broken, table should be in cache');
-    return found[1];
+    return found?.[1] as number;
   }
 
   findTableByEndIterator(ei: number): Table | undefined {
@@ -50,7 +50,7 @@ class IteratorCache<T> {
     assert(iterator >= 0, 'deference of end iterator');
     assert(iterator < this.iteratorToObject.length, 'iterator out of range');
     assert(this.iteratorToObject[iterator]);
-    return this.iteratorToObject[iterator];
+    return this.iteratorToObject[iterator] as T;
   }
 
   set(iterator: number, value: T) {

@@ -107,10 +107,9 @@ const SIGMA82 = new Uint8Array(
 
 export function F(h: Uint32Array, m: Uint32Array, t: Uint32Array, f: boolean, rounds: number) {
   const v = new Uint32Array(32)
-  let i = 0
 
   // init work variables
-  for (i = 0; i < 16; i++) {
+  for (let i = 0; i < 16; i++) {
     v[i] = h[i]
     v[i + 16] = BLAKE2B_IV32[i]
   }
@@ -131,7 +130,7 @@ export function F(h: Uint32Array, m: Uint32Array, t: Uint32Array, f: boolean, ro
   // uncomment the DebugPrint calls to log the computation
   // and match the RFC sample documentation
   // util.debugPrint('          m[16]', m, 64)
-  for (i = 0; i < rounds; i++) {
+  for (let i = 0; i < rounds; i++) {
     // util.debugPrint('   (i=' + (i < 10 ? ' ' : '') + i + ') v[16]', v, 64)
     const ri = (i % 10) * 16
     B2B_G(v, m, 0, 8, 16, 24, SIGMA82[ri + 0], SIGMA82[ri + 1])
@@ -144,7 +143,7 @@ export function F(h: Uint32Array, m: Uint32Array, t: Uint32Array, f: boolean, ro
     B2B_G(v, m, 6, 8, 18, 28, SIGMA82[ri + 14], SIGMA82[ri + 15])
   }
 
-  for (i = 0; i < 16; i++) {
+  for (let i = 0; i < 16; i++) {
     h[i] = h[i] ^ v[i] ^ v[i + 16]
   }
 }

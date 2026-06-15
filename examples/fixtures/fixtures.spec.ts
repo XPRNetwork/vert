@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { expect } from "chai";
 import { Name } from "@greymass/eosio"
-import { Blockchain, nameToBigInt } from "../../dist";
+import { Blockchain, nameToBigInt } from "@proton/vert";
 
 import { fileURLToPath } from 'url';
 

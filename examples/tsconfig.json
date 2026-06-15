@@ -1,17 +1,24 @@
 {
   "compilerOptions": {
-    "module": "esnext",
-    "target": "es2020",
-    "sourceMap": true,
-    "esModuleInterop": true,
-    "moduleResolution": "node",
-    "resolveJsonModule": true,
-    "experimentalDecorators": true,
     "types": [
       "mocha"
-    ]
-  },
-  "lib": [
-    "es2020"
-  ],
+    ],
+    "target": "es2020",
+    "module": "nodenext",
+    /* Recommended Options */
+    "strict": true,
+    "verbatimModuleSyntax": false,
+    "isolatedModules": true,
+    "noUncheckedSideEffectImports": true,
+    "moduleDetection": "force",
+    "skipLibCheck": true,
+    /* Linting */
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "erasableSyntaxOnly": true,
+    "noFallthroughCasesInSwitch": true,
+    "experimentalDecorators": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+  }
 }

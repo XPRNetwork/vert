@@ -1,5 +1,5 @@
 import BN from "bn.js";
-import { Name, UInt64, NameType, Asset } from "@greymass/eosio";
+import { Name, UInt64, type NameType, Asset } from "@greymass/eosio";
 
 export function bnToBigInt (num: BN): bigint {
     return BigInt(num.toString())

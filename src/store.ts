@@ -9,9 +9,9 @@ function defaultComparator(a: any, b: any) {
   return btreeDefaultComparator(a, b);
 }
 
-abstract class PrefixedStore<K,V> {
+export abstract class PrefixedStore<K,V> {
   store: Store<any,V>;
-  id: number;
+  id: number = 0;
 
   set(key: K, value: V) {
     this.store.set(this.key(key), value, this);
@@ -22,7 +22,7 @@ abstract class PrefixedStore<K,V> {
   delete(key: K) {
     this.store.delete(this.key(key));
   }
-  revert(change: StoreChange) {}
+  revert(_: StoreChange) {}
   prev(key: K): V | undefined {
     const found = this.store.prev(this.key(key));
     if (found) {
@@ -72,20 +72,22 @@ abstract class PrefixedStore<K,V> {
   abstract highestKey(): any;
   abstract parsePrefix(key: any): any;
 
-  protected constructor(store: Store<any,V>, options?: any) {
+  protected constructor(store: Store<any,V>, _?: any) {
     this.store = store;
   }
 }
 
-class Store<K,V> {
+export class Store<K,V> {
   private readonly store: BTree<K,V>;
   private prefixes = new BTree<any,PrefixedStore<any,V>>(undefined, defaultComparator);
   public prefixesIndex = new Map<number,PrefixedStore<any,V>>();
   private changes = new Array<StoreChange>();
   private isReverting = false;
   private _seq = 0;
+  private Prefix: any
 
-  constructor(private Prefix, compare: any = defaultComparator) {
+  constructor(prefix: any, compare: any = defaultComparator) {
+    this.Prefix = prefix
     this.store = new BTree<K,V>(undefined, compare);
   }
 
@@ -107,14 +109,16 @@ class Store<K,V> {
     }
     this.changes.push(new CreatePrefixChange({ prefix }));
     prefixedStore = new this.Prefix(this, options);
-    prefixedStore.id = this._seq++;
-    this.prefixes.set(prefix, prefixedStore);
-    this.prefixesIndex.set(prefixedStore.id, prefixedStore);
+    if(prefixedStore) {
+      prefixedStore.id = this._seq++;
+      this.prefixes.set(prefix, prefixedStore);
+      this.prefixesIndex.set(prefixedStore.id, prefixedStore);
+    }
     return prefixedStore;
   }
 
   deletePrefix(prefix: any) {
-    let prefixedStore = this.prefixes.get(prefix);
+    const prefixedStore = this.prefixes.get(prefix);
     if (!prefixedStore) {
       throw new Error('non-existent prefix');
     }
@@ -150,7 +154,7 @@ class Store<K,V> {
   }
 
   delete(key: K) {
-    let value = this.store.get(key);
+    const value = this.store.get(key);
     if (!value) {
       throw new Error('try deleting non-existent item');
     }
@@ -190,18 +194,18 @@ class Store<K,V> {
   }
 }
 
-interface StoreChange {
+export interface StoreChange {
   revert: any,
 }
 
-class CreatePrefixChange implements StoreChange {
+export class CreatePrefixChange implements StoreChange {
   prefix: any;
   constructor(init?: Partial<CreatePrefixChange>) {
     Object.assign(this, init);
   }
-  revert(store) {
+  revert(store: any) {
     log.debug('revert prefix creation');
-    let prefixedStore = store.store.getPrefix(this.prefix);
+    const prefixedStore = store.store.getPrefix(this.prefix);
     if (!prefixedStore) {
       throw new Error('revert stack is corrupted');
     }
@@ -211,14 +215,14 @@ class CreatePrefixChange implements StoreChange {
   }
 }
 
-class DeletePrefixChange implements StoreChange {
+export class DeletePrefixChange implements StoreChange {
   prefixedStore: any;
   constructor(init?: Partial<DeletePrefixChange>) {
     Object.assign(this, init);
   }
-  revert(store) {
+  revert(store: any) {
     log.debug('revert prefix deletion');
-    let prefixedStore = store.store.getPrefix(this.prefixedStore.prefix());
+    const prefixedStore = store.store.getPrefix(this.prefixedStore.prefix());
     if (prefixedStore) {
       throw new Error('revert stack is corrupted');
     }
@@ -227,13 +231,13 @@ class DeletePrefixChange implements StoreChange {
   }
 }
 
-class CreateItemChange implements StoreChange {
+export class CreateItemChange implements StoreChange {
   key: any;
   prefixedStorage?: any;
   constructor(init?: Partial<CreateItemChange>) {
     Object.assign(this, init);
   }
-  revert(store) {
+  revert(store: any) {
     log.debug('revert item creation');
     if (!store.internal.delete(this.key)) {
       throw new Error('revert stack is corrupted');
@@ -244,13 +248,13 @@ class CreateItemChange implements StoreChange {
   }
 }
 
-class UpdateItemChange implements StoreChange {
+export class UpdateItemChange implements StoreChange {
   key: any;
   value: any;
   constructor(init?: Partial<UpdateItemChange>) {
     Object.assign(this, init);
   }
-  revert(store) {
+  revert(store: any) {
     log.debug('revert item update');
     if (!store.internal.has(this.key)) {
       throw new Error('revert stack is corrupted');
@@ -259,13 +263,13 @@ class UpdateItemChange implements StoreChange {
   }
 }
 
-class DeleteItemChange implements StoreChange {
+export class DeleteItemChange implements StoreChange {
   key: any;
   value: any;
   constructor(init?: Partial<DeleteItemChange>) {
     Object.assign(this, init);
   }
-  revert(store) {
+  revert(store: any) {
     log.debug('revert item deletion');
     if (store.internal.has(this.key)) {
       throw new Error('revert stack is corrupted');
@@ -274,13 +278,3 @@ class DeleteItemChange implements StoreChange {
   }
 }
 
-export {
-  PrefixedStore,
-  Store,
-  StoreChange,
-  CreatePrefixChange,
-  DeletePrefixChange,
-  CreateItemChange,
-  UpdateItemChange,
-  DeleteItemChange,
-}

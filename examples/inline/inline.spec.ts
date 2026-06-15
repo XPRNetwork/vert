@@ -1,8 +1,8 @@
 import fs from "fs";
 import path from "path";
 import { expect } from "chai";
-import { Account, Blockchain } from "../../dist";
-import { Name, PermissionLevel, Serializer, Transaction, UInt64 } from "@greymass/eosio"
+import { Account, Blockchain } from "@proton/vert";
+import { Name, PermissionLevel, Serializer, Transaction } from "@greymass/eosio"
 
 import { fileURLToPath } from 'url';
 

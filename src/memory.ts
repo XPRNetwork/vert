@@ -1,11 +1,15 @@
 import Buffer from "./buffer";
 
 export class Memory {
+  private memory: WebAssembly.Memory
+
   static create(initial: number): Memory {
     return new Memory(new WebAssembly.Memory({ initial: initial }));
   }
 
-  constructor(private memory: WebAssembly.Memory) {}
+  constructor(memory: WebAssembly.Memory) {
+    this.memory = memory
+  }
 
   get buffer() {
     return this.memory.buffer;

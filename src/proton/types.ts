@@ -1,5 +1,4 @@
 import { Struct, PermissionLevel, UInt16, TypeAlias, Authority, Name, Action } from "@greymass/eosio";
-import { VM } from "./vm";
 
 @TypeAlias('weight_type')
 export class Weight extends UInt16 {}

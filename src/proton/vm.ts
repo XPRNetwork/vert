@@ -3,7 +3,7 @@ import Buffer, { bufferToBigInt, readBufferFromBigInt } from "../buffer";
 import { log, Vert } from "../vert";
 import { IndexObject, KeyValueObject, SecondaryKeyStore, Table } from "./table";
 import { IteratorCache } from "./iterator-cache";
-import { Action, Name, NameType, PermissionLevel, PublicKey, Serializer, Signature, Transaction, UInt64, Checksum256 } from "@greymass/eosio";
+import { Action, Name, type NameType, PermissionLevel, PublicKey, Serializer, Signature, Transaction, UInt64, Checksum256 } from "@greymass/eosio";
 import { sha256, sha512, sha1, ripemd160 } from "hash.js";
 import { sha3_256, keccak256 } from "js-sha3"
 import { bigIntToName, nameToBigInt, nameTypeToBigInt } from "./bn";
@@ -15,7 +15,7 @@ import { F } from "../utils/blake2";
 import { expmod } from "../utils/expmod";
 import { CodeHashResult } from "../utils/codeHash";
 import { recoverUncompressedDigest } from "../utils/curve";
-const bn128 = require('rustbn.js')
+import bn128 from 'rustbn.js';
 
 type ptr = number;
 type i32 = number;
@@ -89,9 +89,9 @@ class EosioExitResult extends Error {
   }
 }
 
-class VM extends Vert {
+export class VM extends Vert {
   // TODO
-  private context: VM.Context = new VM.Context();
+  private context: VmContext = new VmContext();
   private kvCache = new IteratorCache<KeyValueObject>();
   private idx64 = new IteratorCache<IndexObject<bigint>>();
   private idx128 = new IteratorCache<IndexObject<bigint>>();
@@ -242,7 +242,7 @@ class VM extends Vert {
           log.debug(`-> Notify Action: ${account.name}::${this.context.action}`);
           log.debug(`-> Notify Data Size: ${this.context.data.length}`);
 
-          const context = new VM.Context({
+          const context = new VmContext({
             receiver: account,
             firstReceiver: this.context.isNotification ? this.context.firstReceiver : this.context.receiver,
             action: this.context.action,
@@ -276,19 +276,19 @@ class VM extends Vert {
           }
 
           if (contract.actions[decodedAction.name.toString()]) {
-            const context = new VM.Context({
+            const context = new VmContext({
               sender: this.context.receiver.name,
               receiver: contract,
               firstReceiver: contract,
               action: decodedAction.name,
               data: decodedAction.data.array.slice(),
-              decodedData: decodedAction.decodeData(contract.abi) as any,
+              decodedData: decodedAction.decodeData(contract.abi as any) as any,
               authorization: decodedAction.authorization
             })
             this.context.actionsQueue.push(context)
           }
         },
-        send_context_free_inline: (action: ptr, size: i32): void => {
+        send_context_free_inline: (_action: ptr, _size: i32): void => {
           log.debug('send_context_free_inline');
           // TODO
           throw new Error('send_context_free_inline is not implemented')
@@ -310,7 +310,7 @@ class VM extends Vert {
         },
   
         // chain
-        get_active_producers: (producers: ptr, len: i32): i32 => {
+        get_active_producers: (_producers: ptr, _len: i32): i32 => {
           log.debug('get_active_producers');
           return 0;
         },
@@ -438,7 +438,7 @@ class VM extends Vert {
               .from_(this.memory.buffer, _result, _resultlen)
               .set(result)
             return 0;
-          } catch (e) {
+          } catch {
             return -1
           }
         },
@@ -469,7 +469,7 @@ class VM extends Vert {
               .from_(this.memory.buffer, _result, _resultlen)
               .set(result)
             return 0;
-          } catch (e) {
+          } catch {
             return -1
           }
         },
@@ -485,7 +485,7 @@ class VM extends Vert {
               return -1
             }
             return result[31] === 0 ? 1 : 0;
-          } catch (e) {
+          } catch {
             return -1
           }
         },
@@ -512,7 +512,7 @@ class VM extends Vert {
               .from_(this.memory.buffer, _result, _resultlen)
               .set(resultBuffer)
             return 0;
-          } catch (e) {
+          } catch {
             return -1
           }
         },
@@ -572,7 +572,7 @@ class VM extends Vert {
             const publicKey = recoverUncompressedDigest(signature, digBuffer)
             Buffer.from_(this.memory.buffer, pub, publen).set(publicKey.slice(0, publen));
             return 0;
-          } catch (e) {
+          } catch {
             return -1
           }
         },
@@ -648,7 +648,7 @@ class VM extends Vert {
           if (iterator < -1) {
             const tab = this.kvCache.findTableByEndIterator(iterator);
             assert(tab, 'not a valid end iterator');
-            const kv = tab.penultimate();
+            const kv = tab?.penultimate();
             if (!kv) return -1;
             this.memory.writeUInt64(primary, kv.primaryKey);
             return this.kvCache.add(kv);
@@ -843,7 +843,7 @@ class VM extends Vert {
         },
   
         // 256-bit secondary index api
-        db_idx256_store: (_scope: bigint, _table: bigint, _payer: bigint, _id: bigint, data: ptr, data_len: i32): i32 => {
+        db_idx256_store: (_scope: bigint, _table: bigint, _payer: bigint, _id: bigint, data: ptr, _data_len: i32): i32 => {
           const [scope, table, payer, id] = convertToUnsigned(_scope, _table, _payer, _id);
   
           log.debug(`db_idx256_store: Scope ${bigIntToName(scope)} | Table ${bigIntToName(table)} | ID ${id}`)
@@ -853,7 +853,7 @@ class VM extends Vert {
             scope, table, payer, id, Buffer.from_(this.memory.buffer, data, 32), SecondaryKeyConverter.checksum256);
           return itr;
         },
-        db_idx256_update: (iterator: number, _payer: bigint, data: ptr, data_len: i32): void => {
+        db_idx256_update: (iterator: number, _payer: bigint, data: ptr, _data_len: i32): void => {
           log.debug(`db_idx256_update: Iterator ${iterator}`);
           const payer = BigInt.asUintN(64, _payer);
           this.genericIndex.update(this.bc.store.idx256, this.idx256, iterator, payer,
@@ -863,14 +863,14 @@ class VM extends Vert {
           log.debug(`db_idx256_remove: Iterator ${iterator}`);
           this.genericIndex.remove(this.bc.store.idx256, this.idx256, iterator);
         },
-        db_idx256_find_secondary: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, data_len: i32, primary: ptr): i32 => {
+        db_idx256_find_secondary: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, _data_len: i32, primary: ptr): i32 => {
           log.debug('db_idx256_find_secondary');
           const [code, scope, table] = convertToUnsigned(_code, _scope, _table);
   
           return this.genericIndex.find_secondary(this.bc.store.idx256, this.idx256,
             code, scope, table, Buffer.from_(this.memory.buffer, data, 32), primary, SecondaryKeyConverter.checksum256);
         },
-        db_idx256_find_primary: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, data_len: i32, _primary: bigint): i32 => {
+        db_idx256_find_primary: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, _data_len: i32, _primary: bigint): i32 => {
           log.debug(`db_idx256_find_primary: Code ${_code} | Scope ${_scope} | Table ${_table} | Primary ${_primary}`)
 
           const [code, scope, table, primaryKey] = convertToUnsigned(_code, _scope, _table, _primary);
@@ -878,14 +878,14 @@ class VM extends Vert {
           return this.genericIndex.find_primary(this.bc.store.idx256, this.idx256,
             code, scope, table, Buffer.from_(this.memory.buffer, data, 32), primaryKey, SecondaryKeyConverter.checksum256);
         },
-        db_idx256_lowerbound: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, data_len: i32, primary: ptr): i32 => {
+        db_idx256_lowerbound: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, _data_len: i32, primary: ptr): i32 => {
           log.debug('db_idx256_lowerbound');
           const [code, scope, table] = convertToUnsigned(_code, _scope, _table);
   
           return this.genericIndex.lowerbound_secondary(this.bc.store.idx256, this.idx256,
             code, scope, table, Buffer.from_(this.memory.buffer, data, 32), primary, SecondaryKeyConverter.checksum256);
         },
-        db_idx256_upperbound: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, data_len: i32, primary: ptr): i32 => {
+        db_idx256_upperbound: (_code: bigint, _scope: bigint, _table: bigint, data: ptr, _data_len: i32, primary: ptr): i32 => {
           log.debug('db_idx256_upperbound');
           const [code, scope, table] = convertToUnsigned(_code, _scope, _table);
   
@@ -987,9 +987,9 @@ class VM extends Vert {
   
         // permission
         check_transaction_authorization: (
-          txData: ptr, txSize: i32,
-          pubkeysData: ptr, pubkeysSize: i32,
-          permsData: ptr, permsSize: i32
+          _txData: ptr, _txSize: i32,
+          _pubkeysData: ptr, _pubkeysSize: i32,
+          _permsData: ptr, _permsSize: i32
         ): i32 => {
           log.debug('check_transaction_authorization');
           // TODO
@@ -997,17 +997,17 @@ class VM extends Vert {
           return 1;
         },
         check_permission_authorization: (
-          account: i64, permission: i64,
-          pubkeysData: ptr, pubkeysSize: i32,
-          permsData: ptr, permsSize: i32,
-          delayUs: i64
+          _account: i64, _permission: i64,
+          _pubkeysData: ptr, _pubkeysSize: i32,
+          _permsData: ptr, _permsSize: i32,
+          _delayUs: i64
         ): i32 => {
           log.debug('check_permission_authorization');
           // TODO
           throw new Error('check_permission_authorization is not implemented')
           return 1;
         },
-        get_permission_last_used: (account: i64, permission: i64): i64 => {
+        get_permission_last_used: (_account: i64, _permission: i64): i64 => {
           log.debug('get_permission_last_used');
           // TODO
           throw new Error('get_permission_last_used is not implemented')
@@ -1096,9 +1096,9 @@ class VM extends Vert {
         },
   
         // TODO: privileged APIs
-        set_proposed_producers: (data: ptr, size: number): bigint => { return 0n; },
-        set_blockchain_parameters_packed: (data: ptr, len: number): void => {},
-        get_blockchain_parameters_packed: (data: ptr, len: number): number => { return 0; },
+        set_proposed_producers: (_data: ptr, _size: number): bigint => { return 0n; },
+        set_blockchain_parameters_packed: (_data: ptr, _len: number): void => {},
+        get_blockchain_parameters_packed: (_data: ptr, _len: number): number => { return 0; },
   
         // TODO: security_group APIs
   
@@ -1149,12 +1149,12 @@ class VM extends Vert {
         },
   
         // transaction
-        send_deferred: (sender: ptr, payer: i64, tx: ptr, size: i32, replace: i32) => {
+        send_deferred: (_sender: ptr, _payer: i64, _tx: ptr, _size: i32, _replace: i32) => {
           log.debug('send_deferred');
           // TODO
           throw new Error('send_deferred is not implemented: Deferred TXs are deprecated')
         },
-        cancel_deferred: (sender: ptr): i32 => {
+        cancel_deferred: (_sender: ptr): i32 => {
           log.debug('cancel_deferred');
           // TODO
           throw new Error('cancel_deferred is not implemented: Deferred TXs are deprecated')
@@ -1193,7 +1193,7 @@ class VM extends Vert {
           log.debug('get_action');
 
           const trx = this.context.transaction
-          let action: Action
+          let action: Action | undefined = undefined
 
           if (type == 0) {
             if (index >= trx.context_free_actions.length) {
@@ -1220,7 +1220,7 @@ class VM extends Vert {
           }
           return ps
         },
-        get_context_free_data: (index: i32, buffer: ptr, size: i32): i32 => {
+        get_context_free_data: (_index: i32, _buffer: ptr, _size: i32): i32 => {
           log.debug('get_context_free_data');
           // TODO
           throw new Error('get_context_free_data is not implemented')
@@ -1250,7 +1250,7 @@ class VM extends Vert {
           // log.debug('memcpy');
           // HACK: imitate copying to overlapped destination
           if ((dest - src) < count && (dest - src) >= 0) {
-            const cpy = (d, s, c) => {
+            const cpy = (d: any, s: any, c: any) => {
               if (c <= 0) {
                 return;
               }
@@ -1372,15 +1372,15 @@ class VM extends Vert {
           const retBuffer = Buffer.from_(this.memory.buffer, ret, 16)
           SecondaryKeyConverter.uint128.to(retBuffer, lhs)
          },
-        __addtf3: (a: ptr, b: i64, c: i64, d: i64, e: i64): void => { throw new Error("Not implemented _addtf3: (a: ptr, b: i64, c: i64, d: i64, e: i64)") },
-        __subtf3: (a: ptr, b: i64, c: i64, d: i64, e: i64): void => { throw new Error("Not implemented _subtf3: (a: ptr, b: i64, c: i64, d: i64, e: i64)") },
-        __multf3: (a: ptr, b: i64, c: i64, d: i64, e: i64): void => { throw new Error("Not implemented _multf3: (a: ptr, b: i64, c: i64, d: i64, e: i64)") },
-        __divtf3: (a: ptr, b: i64, c: i64, d: i64, e: i64): void => { throw new Error("Not implemented _divtf3: (a: ptr, b: i64, c: i64, d: i64, e: i64)") },
+        __addtf3: (_a: ptr, _b: i64, _c: i64, _d: i64, _e: i64): void => { throw new Error("Not implemented _addtf3: (a: ptr, b: i64, c: i64, d: i64, e: i64)") },
+        __subtf3: (_a: ptr, _b: i64, _c: i64, _d: i64, _e: i64): void => { throw new Error("Not implemented _subtf3: (a: ptr, b: i64, c: i64, d: i64, e: i64)") },
+        __multf3: (_a: ptr, _b: i64, _c: i64, _d: i64, _e: i64): void => { throw new Error("Not implemented _multf3: (a: ptr, b: i64, c: i64, d: i64, e: i64)") },
+        __divtf3: (_a: ptr, _b: i64, _c: i64, _d: i64, _e: i64): void => { throw new Error("Not implemented _divtf3: (a: ptr, b: i64, c: i64, d: i64, e: i64)") },
         __negtf2: () => { throw new Error("Not implemented _negtf2") },
-        __extendsftf2: (a: ptr, b: f32): void => { throw new Error("Not implemented _extendsftf2: (a: ptr, b: f32)") },
-        __extenddftf2: (a: ptr, b: f64): void => { throw new Error("Not implemented _extenddftf2: (a: ptr, b: f64)") },
-        __trunctfdf2: (a: i64, b: i64): f64 => { throw new Error("Not implemented __trunctfdf2"); },
-        __trunctfsf2: (a: i64, b: i64): f32 => { throw new Error("Not implemented __trunctfsf2"); },
+        __extendsftf2: (_a: ptr, _b: f32): void => { throw new Error("Not implemented _extendsftf2: (a: ptr, b: f32)") },
+        __extenddftf2: (_a: ptr, _b: f64): void => { throw new Error("Not implemented _extenddftf2: (a: ptr, b: f64)") },
+        __trunctfdf2: (_a: i64, _b: i64): f64 => { throw new Error("Not implemented __trunctfdf2"); },
+        __trunctfsf2: (_a: i64, _b: i64): f32 => { throw new Error("Not implemented __trunctfsf2"); },
         __fixtfsi: () => { throw new Error("Not implemented _fixtfsi") },
         __fixtfdi: () => { throw new Error("Not implemented _fixtfdi") },
         __fixtfti: () => { throw new Error("Not implemented _fixtfti") },
@@ -1401,9 +1401,9 @@ class VM extends Vert {
           throw new Error("Not implemented _fixunsdfti")
         },
         __floatsidf: () => { throw new Error("Not implemented _floatsidf") },
-        __floatsitf: (a: ptr, b: i32): void => { throw new Error("Not implemented _floatsitf: (a: ptr, b: i32)") },
+        __floatsitf: (_a: ptr, _b: i32): void => { throw new Error("Not implemented _floatsitf: (a: ptr, b: i32)") },
         __floatditf: () => { throw new Error("Not implemented _floatditf") },
-        __floatunsitf: (a: ptr, b: i32): void => { throw new Error("Not implemented _floatunsitf: (a: ptr, b: i32)") },
+        __floatunsitf: (_a: ptr, _b: i32): void => { throw new Error("Not implemented _floatunsitf: (a: ptr, b: i32)") },
         __floatunditf: () => { throw new Error("Not implemented _floatunditf") },
         __floattidf: () => { throw new Error("Not implemented _floattidf") },
 
@@ -1417,16 +1417,15 @@ class VM extends Vert {
         },
 
         __cmptf2: () => { throw new Error("Not implemented _cmptf2") },
-        __eqtf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __eqtf2"); },
-        __netf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __netf2"); },
-        __getf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __getf2"); },
+        __eqtf2: (_a: i64, _b: i64, _c: i64, _d: i64): i32 => { throw new Error("Not implemented __eqtf2"); },
+        __netf2: (_a: i64, _b: i64, _c: i64, _d: i64): i32 => { throw new Error("Not implemented __netf2"); },
+        __getf2: (_a: i64, _b: i64, _c: i64, _d: i64): i32 => { throw new Error("Not implemented __getf2"); },
         __gttf2: () => { throw new Error("Not implemented _gttf2") },
-        __letf2: (a: i64, b: i64, c: i64, d: i64): i32 => { throw new Error("Not implemented __letf2"); },
+        __letf2: (_a: i64, _b: i64, _c: i64, _d: i64): i32 => { throw new Error("Not implemented __letf2"); },
         __lttf2: () => { throw new Error("Not implemented _lttf2") },
         __unordtf2: () => { throw new Error("Not implemented _unordtf2") },
       },
     };
-
     super(imports, wasm);
     this.imports = imports;
     this.bc = bc;
@@ -1453,7 +1452,7 @@ class VM extends Vert {
     store: <K,>(
       index: SecondaryKeyStore<K>,
       cache: IteratorCache<IndexObject<K>>,
-      scope: bigint, table: bigint, payer: bigint, id: bigint, secondary: Buffer, conv
+      scope: bigint, table: bigint, payer: bigint, id: bigint, secondary: Buffer, conv: any
     ) => {
       assert(payer !== 0n, 'must specify a valid account to pay for new record');
       const tab = this.findOrCreateTable(this.context.receiver.name, bigIntToName(scope), bigIntToName(table), bigIntToName(payer));
@@ -1470,7 +1469,7 @@ class VM extends Vert {
     update: <K,>(
       index: SecondaryKeyStore<K>,
       cache: IteratorCache<IndexObject<K>>,
-      iterator: number, payer: bigint, secondary: Buffer, conv
+      iterator: number, payer: bigint, secondary: Buffer, conv: any
     ) => {
       const obj = cache.get(iterator);
       const tab = cache.getTable(obj.tableId);
@@ -1498,7 +1497,7 @@ class VM extends Vert {
     find_secondary: <K,>(
       index: SecondaryKeyStore<K>,
       cache: IteratorCache<IndexObject<K>>,
-      code: bigint, scope: bigint, table: bigint, secondary: Buffer, primary: ptr, conv
+      code: bigint, scope: bigint, table: bigint, secondary: Buffer, primary: ptr, conv: any
     ) => {
       const tab = this.findTable(bigIntToName(code), bigIntToName(scope), bigIntToName(table));
       if (!tab) {
@@ -1520,7 +1519,7 @@ class VM extends Vert {
     lowerbound_secondary: <K,>(
       index: SecondaryKeyStore<K>,
       cache: IteratorCache<IndexObject<K>>,
-      code: bigint, scope: bigint, table: bigint, secondary: Buffer, primary: ptr, conv
+      code: bigint, scope: bigint, table: bigint, secondary: Buffer, primary: ptr, conv: any
     ) => {
       const tab = this.findTable(bigIntToName(code), bigIntToName(scope), bigIntToName(table));
       if (!tab) {
@@ -1542,7 +1541,7 @@ class VM extends Vert {
     upperbound_secondary: <K,>(
       index: SecondaryKeyStore<K>,
       cache: IteratorCache<IndexObject<K>>,
-      code: bigint, scope: bigint, table: bigint, secondary: Buffer, primary: ptr, conv
+      code: bigint, scope: bigint, table: bigint, secondary: Buffer, primary: ptr, conv: any
     ) => {
       const tab = this.findTable(bigIntToName(code), bigIntToName(scope), bigIntToName(table));
       if (!tab) {
@@ -1562,7 +1561,7 @@ class VM extends Vert {
       return cache.add(obj);
     },
     end_secondary: <K,>(
-      index: SecondaryKeyStore<K>,
+      _: SecondaryKeyStore<K>,
       cache: IteratorCache<IndexObject<K>>,
       code: bigint, scope: bigint, table: bigint
     ) => {
@@ -1596,6 +1595,9 @@ class VM extends Vert {
       if (iterator < -1) {
         const tab = cache.findTableByEndIterator(iterator);
         assert(tab, 'not a valid end iterator');
+        if(!tab) {
+          return -1;
+        }
         const obj = index.secondary.penultimate(tab.id);
         // console.log(obj)
         if (!obj) {
@@ -1615,7 +1617,7 @@ class VM extends Vert {
     find_primary: <K,>(
       index: SecondaryKeyStore<K>,
       cache: IteratorCache<IndexObject<K>>,
-      code: bigint, scope: bigint, table: bigint, secondary: Buffer, primary: bigint, conv
+      code: bigint, scope: bigint, table: bigint, secondary: Buffer, primary: bigint, conv: any
     ) => {
       const tab = this.findTable(bigIntToName(code), bigIntToName(scope), bigIntToName(table));
       if (!tab) {
@@ -1634,7 +1636,7 @@ class VM extends Vert {
     },
   };
 
-  apply(context: VM.Context) {
+  apply(context: VmContext) {
     this.context = context;
     
     // Check authorization
@@ -1670,8 +1672,6 @@ class VM extends Vert {
         this.context.firstReceiver.toBigInt(),
         nameToBigInt(this.context.action)
       );
-    } catch (e) {
-      throw e
     } finally {
       this.finalize();
     }
@@ -1686,38 +1686,35 @@ class VM extends Vert {
   }
 }
 
-namespace VM {
-  export class Context {
-    sender: Name = new Name(UInt64.from(0));
-    actionOrdinal: number
-    executionOrder: number
-    firstReceiver: Account;
-    // tx: Transaction; TODO
 
-    receiver: Account;
-    action: Name;
-    data: Uint8Array;
-    returnValue: Uint8Array;
-    authorization: PermissionLevel[] = [];
-    actionsQueue: VM.Context[] = [];
-    notificationsQueue: VM.Context[] = [];
-    transaction: Transaction;
-    decodedData: Action
+export class VmContext {
+  sender: Name = new Name(UInt64.from(0));
+  actionOrdinal!: number
+  executionOrder!: number
+  firstReceiver!: Account;
+  // tx: Transaction; TODO
 
-    constructor(init?: Partial<Context>) {
-      Object.assign(this, init);
-    }
+  receiver!: Account;
+  action!: Name;
+  data!: Uint8Array;
+  returnValue!: Uint8Array;
+  authorization: PermissionLevel[] = [];
+  actionsQueue: VmContext[] = [];
+  notificationsQueue: VmContext[] = [];
+  transaction!: Transaction;
+  decodedData!: Action
 
-    get isInline () {
-      return !this.sender.equals(new Name(UInt64.from(0)))
-    }
+  constructor(init?: Partial<VmContext>) {
+    Object.assign(this, init);
+  }
 
-    get isNotification () {
-      return !this.receiver.name.equals(this.firstReceiver.name)
-    }
+  get isInline () {
+    return !this.sender.equals(new Name(UInt64.from(0)))
+  }
+
+  get isNotification () {
+    return !this.receiver.name.equals(this.firstReceiver.name)
   }
 }
 
-export {
-  VM,
-}
+

@@ -22,18 +22,17 @@ The focus of VeRT is on the better compatibility than the performance, so it can
 npm install @proton/vert
 ```
 
-## Test
+## Development
 
-- nodejs v16 or higher
 
 ```shell
-npm run test
+pnpm install
 ```
 
-- nodejs v14
+## Test
 
 ```shell
-node --experimental-wasm-bigint node_modules/mocha/bin/_mocha src/**/*.spec.ts -r ts-node/register
+pnpm run test
 ```
 
 ## License

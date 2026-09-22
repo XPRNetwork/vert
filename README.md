@@ -67,8 +67,10 @@ pnpm install
 pnpm run test
 ```
 
-This runs the library tests, which include the toolchain compatibility checks in
-[src/proton/tests/cdt.spec.ts](./src/proton/tests/cdt.spec.ts), followed by the example suites.
+This runs the library tests, followed by the example suites.
+[src/proton/tests/cdt.spec.ts](./src/proton/tests/cdt.spec.ts) covers the one case no installed
+toolchain produces any more: a contract built before CDT v4.1.0, which leaves its memory
+unexported.
 
 Example binaries are not checked in, so build them first. Each suite is built by the toolchain it
 demonstrates, which means `pnpm --filter examples run build` needs both compilers on the `PATH`;

@@ -1,0 +1,84 @@
+name: CDT
+
+# Builds examples/cdt with AntelopeIO CDT and runs it against VeRT. CDT ships
+# Linux x86_64 packages only, so this is the supported way to exercise the
+# suite. The blanc-built example suites are not run here, since blanc has to be
+# installed separately.
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  # v4.1.0 is the first release that exports the wasm memory VeRT reads.
+  CDT_VERSION: 4.1.1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install AntelopeIO CDT
+        run: |
+          sudo apt-get update
+
+          # CDT publishes its package from an older Ubuntu than the runner
+          # image, so its clang needs an ncurses release that newer images no
+          # longer package.
+          if ! sudo apt-get install -y libtinfo5; then
+            pool=http://archive.ubuntu.com/ubuntu/pool/universe/n/ncurses
+            deb=$(curl -fsSL "$pool/" | grep -o 'libtinfo5_[^"]*_amd64\.deb' | sort -uV | tail -1)
+            curl -fsSL -O "$pool/$deb"
+            sudo apt-get install -y "./$deb"
+          fi
+
+          curl -fsSL -O "https://github.com/AntelopeIO/cdt/releases/download/v${CDT_VERSION}/cdt_${CDT_VERSION}-1_amd64.deb"
+          sudo apt-get install -y "./cdt_${CDT_VERSION}-1_amd64.deb"
+
+      - run: pnpm install --frozen-lockfile
+
+      # The examples resolve @proton/vert through dist, so build the package first.
+      - run: pnpm run build
+
+      - run: pnpm run lint
+
+      - name: Test library
+        run: pnpm exec mocha
+
+      - name: Build examples/cdt with cdt-cpp
+        run: pnpm --filter examples run build:cdt
+
+      - name: Report the exports cdt-cpp produced
+        run: |
+          node -e '
+            const fs = require("fs");
+            const module_ = new WebAssembly.Module(fs.readFileSync("examples/cdt/cdt.wasm"));
+            console.log(WebAssembly.Module.exports(module_));
+          '
+
+      - name: Test examples/cdt
+        run: pnpm --filter examples run test:cdt
+
+      # Lets contributors without a Linux toolchain download a CDT build and run
+      # the suite locally.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cdt-contract
+          path: |
+            examples/cdt/cdt.wasm
+            examples/cdt/cdt.abi
+          if-no-files-found: warn

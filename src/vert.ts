@@ -30,7 +30,14 @@ export class Vert {
       const { module, instance } = await WebAssembly.instantiate(bytes as BufferSource, imports)
       this.module = module;
       this.instance = instance;
-      this._memory = new Memory(this.instance.exports.memory as WebAssembly.Memory);
+      const memory = this.instance.exports.memory
+      if (!(memory instanceof WebAssembly.Memory)) {
+        throw new Error(
+          'contract wasm does not export its memory, so its state cannot be read. ' +
+          'Rebuild it with AntelopeIO CDT v4.1.0 or higher, or blanc v0.9.2 or higher.'
+        )
+      }
+      this._memory = new Memory(memory);
     }
     this.ready = getReady();
   }

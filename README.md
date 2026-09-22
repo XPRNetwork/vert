@@ -75,7 +75,9 @@ demonstrates, which means `pnpm --filter examples run build` needs both compiler
 build a single suite instead if you only have one of them installed:
 
 ```shell
-# examples/cdt, built with cdt-cpp; its suite is skipped while the binary is missing
+# examples/cdt, built with cdt-cpp; its suite is skipped while the binary is missing.
+# When invoking cdt-cpp by hand, pass the source path without a leading ./ — with one,
+# cdt-cpp loses track of the dispatcher it generates and the link aborts.
 pnpm --filter examples run build:cdt
 
 # examples/foo, built with blanc++

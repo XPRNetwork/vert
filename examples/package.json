@@ -9,7 +9,7 @@
     "build:foo": "blanc++ ./foo/foo.cpp -o ./foo/foo.wasm",
     "build:timer": "blanc++ ./timer/timer.cpp -o ./timer/timer.wasm",
     "build:fixtures": "blanc++ ./fixtures/fixtures.cpp -o ./fixtures/fixtures.wasm",
-    "build:cdt": "cdt-cpp ./cdt/cdt.cpp -o ./cdt/cdt.wasm",
+    "build:cdt": "cdt-cpp cdt/cdt.cpp -o cdt/cdt.wasm",
     "build": "run-p build:*",
     "test:foo": "mocha ./foo/foo.spec.ts",
     "test:inline": "mocha ./inline/inline.spec.ts -r ts-node/register",

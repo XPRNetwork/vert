@@ -1,4 +1,4 @@
-import { Checksum256, Checksum256Type, Signature } from '@greymass/eosio'
+import { Checksum256, type Checksum256Type, Signature } from '@greymass/eosio'
 import { ec } from 'elliptic'
 
 const curves: {[type: string]: ec} = {}

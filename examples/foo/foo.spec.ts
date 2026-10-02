@@ -2,15 +2,20 @@ import fs from "fs";
 import path from "path";
 import { expect } from "chai";
 import { Name, Int64 } from "@greymass/eosio"
-import { Blockchain, nameToBigInt, protonAssert } from "../../dist";
+import { Blockchain, nameToBigInt, protonAssert } from "@proton/vert";
+
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const blockchain = new Blockchain()
 
 const testName = Name.from('test')
 const foo = blockchain.createAccount({
   name: testName,
-  wasm: fs.readFileSync(path.join(__dirname, '/foo.wasm')),
-  abi: fs.readFileSync(path.join(__dirname, '/foo.abi'), 'utf8')
+  wasm: fs.readFileSync(path.join(__dirname, 'foo.wasm')),
+  abi: fs.readFileSync(path.join(__dirname, 'foo.abi'), 'utf8')
 });
 blockchain.createAccount('alice')
 blockchain.createAccount('bob')
@@ -25,7 +30,7 @@ describe('foo_test', () => {
       // try storing value with the wrong permission
       await foo.actions.store(['alice', 1]).send('bob@active');
     } catch (e) {
-      expect(e.message).to.equal('missing required authority alice');
+      expect((e as Error).message).to.equal('missing required authority alice');
     }
   });
 
@@ -34,7 +39,7 @@ describe('foo_test', () => {
       // try storing a negative value
       await foo.actions.store(['alice', -1]).send('alice@active');
     } catch (e) {
-      expect(e.message).to.equal(protonAssert('require non-negative value'));
+      expect((e as Error).message).to.equal(protonAssert('require non-negative value'));
     }
   });
 

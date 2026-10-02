@@ -8,18 +8,17 @@ import { Blockchain } from "../blockchain";
 
 const bc = new Blockchain()
 
-let vm;
-let memory;
-
-beforeEach(() => {
-  bc.clearConsole()
-  vm = VM.from(new Uint8Array(), bc);
-  memory = Memory.create(256);
-  // @ts-ignore
-  vm._memory = memory;
-});
+let vm: any;
+let memory: any;
 
 describe('eos-vm imports', () => {
+  beforeEach(() => {
+    bc.clearConsole()
+    vm = VM.from(new Uint8Array(), bc);
+    memory = Memory.create(256);
+    vm._memory = memory;
+  });
+
   describe('crypto', () => {
     it('assert_sha256', () => {
       const buffer = Buffer.from_(memory.buffer);

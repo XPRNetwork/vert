@@ -1,4 +1,4 @@
-const findEndBracket = (str) => {
+const findEndBracket = (str: string) => {
     let left = 0
     let right = -1
 
@@ -22,7 +22,7 @@ const findEndBracket = (str) => {
     return endIndex
 }
 
-export const findStartAndEnd = (text, pattern, color) => {
+export const findStartAndEnd = (text: string, pattern: any, color: any) => {
     let index = 0
 
     while (true) {

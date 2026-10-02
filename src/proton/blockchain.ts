@@ -1,12 +1,12 @@
-import { Name, Transaction, TimePoint, TimePointSec, NameType, Checksum256 } from "@greymass/eosio";
+import { Name, Transaction, TimePoint, TimePointSec, type NameType, Checksum256 } from "@greymass/eosio";
 import * as fs from "fs";
 import fetch from "cross-fetch"
 import { diff, flattenChangeset, Operation } from '../utils/diff'
-import { set } from 'lodash'
+import { set } from 'lodash-es'
 import { Table, TableStore } from "./table";
-import { Account, AccountArgs } from "./account";
-import { SecondaryKeyConverter, VM } from "./vm";
-import { ExecutionTrace } from "./types";
+import { Account, type AccountArgs } from "./account";
+import { SecondaryKeyConverter, VmContext } from "./vm";
+import type { ExecutionTrace } from "./types";
 import { contextToExecutionTrace, logExecutionTrace } from "./utils";
 import { bigIntToName } from "./bn";
 import { findStartAndEnd } from '../utils/color'
@@ -20,7 +20,7 @@ export class Blockchain {
   blockNum: number
   store: TableStore
   console: string = ''
-  actionTraces: VM.Context[] = []
+  actionTraces: VmContext[] = []
   executionTraces: ExecutionTrace[] = []
   protocolFeatures: string[] = ACTIVATED_PROTOCOL_FEATURES
 
@@ -58,7 +58,7 @@ export class Blockchain {
         throw new Error(`Contract ${action.account} missing for inline action`)
       }
 
-      let context = new VM.Context({
+      let context = new VmContext({
         receiver: contract,
         firstReceiver: contract,
         action: action.name,
@@ -69,7 +69,7 @@ export class Blockchain {
       })
 
       let actionsQueue = [context]
-      let notificationsQueue = []
+      let notificationsQueue: any[] = []
 
       while(notificationsQueue.length || actionsQueue.length) {
         // Shift context and increment orders
@@ -77,7 +77,7 @@ export class Blockchain {
           context = notificationsQueue.shift()
           context.actionOrdinal = actionOrdinal;
         } else if (actionsQueue.length) {
-          context = actionsQueue.shift();
+          context = actionsQueue.shift() as VmContext;
           context.actionOrdinal = ++actionOrdinal;
         }
         context.executionOrder = ++executionOrder;
@@ -88,7 +88,7 @@ export class Blockchain {
         logExecutionTrace(this.executionTraces[this.executionTraces.length - 1])
 
         // Execute context
-        context.receiver.vm.apply(context)
+        context.receiver.vm?.apply(context)
 
         // Add to local queues
         notificationsQueue = notificationsQueue.concat(context.notificationsQueue)
@@ -167,7 +167,7 @@ export class Blockchain {
    * @returns A promise of a Uint8Array.
    */
   async readWasm (fileName: string): Promise<Uint8Array> {
-    if (!!fs.readFileSync) {
+    if (fs.readFileSync) {
         return fs.readFileSync(fileName)
     } else {
         const res = await fetch(fileName)
@@ -181,7 +181,7 @@ export class Blockchain {
   * @returns The ABI of the contract.
   */
   async readAbi (fileName: string): Promise<string> {
-    if (!!fs.readFileSync) {
+    if (fs.readFileSync) {
         return fs.readFileSync(fileName, 'utf8')
     } else {
         const res = await fetch(fileName)
@@ -275,7 +275,7 @@ export class Blockchain {
   }
 
   public printStorageDeltas() {
-    const stringifyWithBigInt = (json) => JSON.stringify(json, (key, value) => {
+    const stringifyWithBigInt = (json: any) => JSON.stringify(json, (_, value) => {
       return typeof value === 'bigint' ? value.toString() : value
     }, 4)
 
@@ -298,7 +298,7 @@ export class Blockchain {
       return sec.replace(/\.+$/, "")
     }
 
-    const convertSecondary = (indexType, value) => {
+    const convertSecondary = (indexType: any, value: any) => {
       const obj: {
         type: string,
         value: any,
@@ -335,16 +335,16 @@ export class Blockchain {
       const scopeName = bigIntToName(tab.scope).toString() || '.'
       const tableName = secondaryTableToPrimary(bigIntToName(tab.table).toString())
 
-      if (!rowsByTable[codeName]) {
-        rowsByTable[codeName] = {}
+      if (!(rowsByTable as any)[codeName]) {
+        (rowsByTable as any)[codeName] = {}
       }
 
-      if (!rowsByTable[codeName][tableName]) {
-        rowsByTable[codeName][tableName] = {}
+      if (!(rowsByTable as any)[codeName][tableName]) {
+        (rowsByTable as any)[codeName][tableName] = {}
       }
 
-      if (!rowsByTable[codeName][tableName][scopeName]) {
-        rowsByTable[codeName][tableName][scopeName] = []
+      if (!(rowsByTable as any)[codeName][tableName][scopeName]) {
+        (rowsByTable as any)[codeName][tableName][scopeName] = []
       }
 
       let value = tab.lowerbound(tab.lowestKey())
@@ -366,7 +366,7 @@ export class Blockchain {
         }
 
         for (const index of indexes) {
-          const secondaryObj = this.store[index].get({
+          const secondaryObj = (this.store as any)[index].get({
             tableId: value.tableId,
             primaryKey: value.primaryKey
           });
@@ -379,7 +379,7 @@ export class Blockchain {
           }
         }
 
-        rowsByTable[codeName][tableName][scopeName].push(primaryObj)
+        (rowsByTable as any)[codeName][tableName][scopeName].push(primaryObj)
         value = tab.next(value.primaryKey)
       }
     }
@@ -397,6 +397,7 @@ export class Blockchain {
       const [account, table, scope, index] = change.path
       // console.log(account, table, scope, index, change.type, change.key)
       const fill = (storage: any) => {
+        // eslint-disable-next-line no-useless-assignment
         let path = []
         if (account) {
           if (table) {
@@ -419,12 +420,13 @@ export class Blockchain {
       }
 
       if (change.type === Operation.UPDATE) {
-        set(parsedDiff, [account, table, scope, index], this.preStorage[account][table][scope][index])
+        set(parsedDiff, [account, table, scope, index], this.preStorage[account][table][scope][index]);
         set(parsedDiff, change.path, {
           old: change.oldValue,
           new: change.value
-        })
-        parsedDiff[account][table][scope] = parsedDiff[account][table][scope].filter(_ => !!_)
+        });
+
+        (parsedDiff as any)[account][table][scope] = (parsedDiff as any)[account][table][scope].filter((_: any)=> !!_)
       } else if (change.type === Operation.ADD) {
         const path = fill(this.postStorage)
         set(parsedDiff, path, { new: change.value })

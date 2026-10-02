@@ -1,0 +1,7 @@
+{
+  "extension": ["js", "ts"],
+  "require": ["./register-loader.js", "ts-node/register"],
+  "node-option": [
+    "experimental-specifier-resolution=node"
+  ]
+}

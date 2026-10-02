@@ -56,7 +56,7 @@ export default class Buffer extends Uint8Array {
           {
             if (buffer.length === 0) return new Buffer();
             if (buffer.length % 2 === 1) buffer = '0' + buffer;
-            return new Buffer(buffer.match(/.{1,2}/g).map(byte => parseInt(byte, 16)));
+            return new Buffer(buffer.match(/.{1,2}/g).map((byte: any) => parseInt(byte, 16)));
           }
         default:
           return new Buffer(encoder.encode(buffer));

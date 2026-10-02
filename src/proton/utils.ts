@@ -1,7 +1,7 @@
 import { Name, API, Authority, PermissionLevel } from "@greymass/eosio";
 import log from "loglevel";
-import { AccountPermission, ExecutionTrace, PermissionLevelWeight } from "./types";
-import { VM } from "./vm";
+import { AccountPermission, type ExecutionTrace, PermissionLevelWeight } from "./types";
+import { VmContext } from "./vm";
 import colors from "colors/safe"
 
 /**
@@ -26,7 +26,6 @@ export function findLastIndex<T>(array: Array<T>, predicate: (value: T, index: n
  * @param {Name} name - The name of the account to create.
  * @returns The `generatePermissions` function returns an array of `AccountPermission` objects.
  */
-// @ts-ignore
 export const generatePermissions = (name: Name) => {
     const defaultPerms = [
       { perm_name: 'owner', parent: '' },
@@ -56,14 +55,16 @@ export const generatePermissions = (name: Name) => {
  */
 export const addInlinePermission = (name: Name, permissions: API.v1.AccountPermission[]) => {
     const activePerm = permissions.find(perm => perm.perm_name.equals(Name.from("active")))
-    activePerm.required_auth.accounts.push(PermissionLevelWeight.from({
-      weight: 1,
-      permission: PermissionLevel.from({
-        actor: name,
-        permission: 'eosio.code'
-      })
-    }))
-    activePerm.required_auth.sort()
+    if(activePerm) {
+      activePerm.required_auth.accounts.push(PermissionLevelWeight.from({
+        weight: 1,
+        permission: PermissionLevel.from({
+          actor: name,
+          permission: 'eosio.code'
+        })
+      }))
+      activePerm.required_auth.sort()
+    }
 }
 
 /**
@@ -84,7 +85,7 @@ export function isAuthoritySatisfied (authority: Authority, permission: Permissi
     return Boolean(weight >= authority.threshold.toNumber())
 }
 
-export const contextToExecutionTrace = (context: VM.Context): ExecutionTrace => ({
+export const contextToExecutionTrace = (context: VmContext): ExecutionTrace => ({
   contract: context.receiver.name,
   action: context.action,
   isInline: context.isInline,

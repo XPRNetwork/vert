@@ -17,16 +17,12 @@ const eosioToken = blockchain.createAccount({
 blockchain.createAccount('alice')
 blockchain.createAccount('bob')
 
-beforeEach(() => {
-  blockchain.resetTables()
-})
-
 /**
  * Helpers
  */
 const getStat = (symcode: string) => {
   const symcodeBigInt = symbolCodeToBigInt(Asset.SymbolCode.from(symcode));
-  return eosioToken.tables.stat(symcodeBigInt).getTableRow(symcodeBigInt)
+  return eosioToken.tables.stat(symcodeBigInt)?.getTableRow(symcodeBigInt)
 }
 
 const getAccount = (accountName: string, symcode: string) => {
@@ -51,6 +47,10 @@ function account(balance: string) {
  * Tests
  */
 describe('eos-vm', () => {
+  beforeEach(() => {
+    blockchain.resetTables()
+  })
+
   describe('eosio.token', () => {
     it('create', async () => {
       const symcode = 'TKN';
@@ -63,7 +63,7 @@ describe('eos-vm', () => {
       try {
         await eosioToken.actions.create(['alice', '-1000.000 TKN']).send();
       } catch (e) {
-        expect(e.message).to.equal(protonAssert('max-supply must be positive'));
+        expect((e as Error).message).to.equal(protonAssert('max-supply must be positive'));
       }
     });
 
@@ -75,7 +75,7 @@ describe('eos-vm', () => {
       try {
         await action.send();
       } catch (e) {
-        expect(e.message).to.equal(protonAssert('token with symbol already exists'));
+        expect((e as Error).message).to.equal(protonAssert('token with symbol already exists'));
       }
     });
 
@@ -88,7 +88,7 @@ describe('eos-vm', () => {
       try {
         await eosioToken.actions.create(['alice', '4611686018427387904 NKT']).send();
       } catch (e) {
-        expect(e.message).to.equal(protonAssert('invalid supply'));
+        expect((e as Error).message).to.equal(protonAssert('invalid supply'));
       }
     });
 
@@ -102,7 +102,7 @@ describe('eos-vm', () => {
       try {
         await eosioToken.actions.create(['alice', '1.0000000000000000000 NKT']).send();
       } catch (e) {
-        expect(e.message).to.equal('Encoding error at root<create>.maximum_supply<asset>: Invalid asset symbol, precision too large');
+        expect((e as Error).message).to.equal('Encoding error at root<create>.maximum_supply<asset>: Invalid asset symbol, precision too large');
       }
     });
 
@@ -118,13 +118,13 @@ describe('eos-vm', () => {
       try {
         await eosioToken.actions.issue(['alice', '500.001 TKN', 'hola']).send('alice@active');
       } catch (e) {
-        expect(e.message).to.equal(protonAssert('quantity exceeds available supply'));
+        expect((e as Error).message).to.equal(protonAssert('quantity exceeds available supply'));
       }
 
       try {
         await eosioToken.actions.issue(['alice', '-1.000 TKN', 'hola']).send('alice@active');
       } catch (e) {
-        expect(e.message).to.equal(protonAssert('must issue positive quantity'));
+        expect((e as Error).message).to.equal(protonAssert('must issue positive quantity'));
       }
 
       // Check whether action succeeds without exceptions
@@ -146,13 +146,13 @@ describe('eos-vm', () => {
       try {
         await eosioToken.actions.transfer(['alice', 'bob', '701 CERO', 'hola']).send('alice@active');
       } catch (e) {
-        expect(e.message).to.equal(protonAssert('overdrawn balance'));
+        expect((e as Error).message).to.equal(protonAssert('overdrawn balance'));
       }
 
       try {
         await eosioToken.actions.transfer(['alice', 'bob', '-1000 CERO', 'hola']).send('alice@active');
       } catch (e) {
-        expect(e.message).to.equal(protonAssert('must transfer positive quantity'));
+        expect((e as Error).message).to.equal(protonAssert('must transfer positive quantity'));
       }
     });
   });

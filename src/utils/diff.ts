@@ -1,6 +1,10 @@
-import { Dictionary, difference, find, intersection, keyBy } from 'lodash';
+import { difference, find, intersection, keyBy } from 'lodash-es';
 
 type FunctionKey = (obj: any) => any;
+
+interface Dictionary<T> {
+  [index: string]: T;
+}
 
 export const getTypeOfObj = (obj: any) => {
   if (typeof obj === 'undefined') {
@@ -15,7 +19,11 @@ export const getTypeOfObj = (obj: any) => {
     return null;
   }
 
-  return Object.prototype.toString.call(obj).match(/^\[object\s(.*)\]$/)[1];
+  const match = Object.prototype.toString.call(obj).match(/^\[object\s(.*)\]$/)
+  if(!match) {
+    return null
+  }
+  return match[1];
 };
 
 const getKey = (path: string) => {
@@ -46,7 +54,7 @@ const compare = (oldObj: any, newObj: any, path: any, embeddedObjKeys: any, keyP
         }))
       );
       break;
-    case 'Object':
+    case 'Object': {
       const diffs = compareObject(oldObj, newObj, path, embeddedObjKeys, keyPath);
       if (diffs.length) {
         if (path.length) {
@@ -59,7 +67,8 @@ const compare = (oldObj: any, newObj: any, path: any, embeddedObjKeys: any, keyP
           changes = changes.concat(diffs);
         }
       }
-      break;
+      break; 
+    }
     case 'Array':
       changes = changes.concat(compareArray(oldObj, newObj, path, embeddedObjKeys, keyPath));
       break;
@@ -115,7 +124,7 @@ const compareObject = (oldObj: any, newObj: any, path: any, embeddedObjKeys: any
   const addedKeys = difference(newObjKeys, oldObjKeys);
   for (k of addedKeys) {
     newPath = path.concat([k]);
-    newKeyPath = skipPath ? keyPath : keyPath.concat([k]);
+    // newKeyPath = skipPath ? keyPath : keyPath.concat([k]);
     changes.push({
       type: Operation.ADD,
       key: getKey(newPath),
@@ -126,7 +135,7 @@ const compareObject = (oldObj: any, newObj: any, path: any, embeddedObjKeys: any
   const deletedKeys = difference(oldObjKeys, newObjKeys);
   for (k of deletedKeys) {
     newPath = path.concat([k]);
-    newKeyPath = skipPath ? keyPath : keyPath.concat([k]);
+    // newKeyPath = skipPath ? keyPath : keyPath.concat([k]);
     changes.push({
       type: Operation.REMOVE,
       key: getKey(newPath),
@@ -344,14 +353,22 @@ export const revertChangeset = (obj: any, changeset: Changeset) => {
   return obj;
 };
 
-export enum Operation {
-  REMOVE = 'REMOVE',
-  ADD = 'ADD',
-  UPDATE = 'UPDATE'
-}
+export const Operation = {
+  REMOVE: 'REMOVE',
+  ADD: 'ADD',
+  UPDATE: 'UPDATE'
+} as const;
+
+type OperationValue = (typeof Operation)[keyof typeof Operation];
+
+// export enum Operation {
+//   REMOVE = 'REMOVE',
+//   ADD = 'ADD',
+//   UPDATE = 'UPDATE'
+// }
 
 export interface IChange {
-  type: Operation;
+  type: OperationValue;
   key: string;
   embeddedKey?: string | FunctionKey;
   value?: any | any[];
@@ -361,7 +378,7 @@ export interface IChange {
 export type Changeset = IChange[];
 
 export interface IFlatChange {
-  type: Operation;
+  type: OperationValue;
   key: string;
   path: string;
   valueType: string | null;
